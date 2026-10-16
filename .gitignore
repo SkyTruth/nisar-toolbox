@@ -1,0 +1,34 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual Environments
+.venv
+
+# Environment Variables
+.env
+.env.*
+!.env.default
+
+# AI (set up to deny write or edit access since this is a learning repo)
+.claude/settings.local.json
+
+# Data. Keeping data downloads and derived rasters out of the repo
+data/*
+!data/.gitkeep
+*.h5
+*.tif
+*.tif.part
+*.h5.part
+*.parquet
+.DS_Store
+
+# Old Snippets, Miscellaneous Code used only in local, throw-away tests
+archive/
+
+# Private AOI data, in case you don't want them shared
+utils/aois.py
