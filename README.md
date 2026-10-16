@@ -13,19 +13,19 @@ environment contract is `pyproject.toml`, `uv.lock`, and `.python-version`.
 
 Run all commands in this README from the repository root.
 
-Set up the shared environment:
+1. Set up the shared environment:
 ```bash
 uv sync --locked
 ```
 
-Create all local, git-ignored files and directories (can be re-run, will not overwrite any already existing files/dirs).
+2. Create all local, git-ignored files and directories (can be re-run, will not overwrite any already existing files/dirs).
 ```bash
 uv run python -m utils.setup
 ```
 This creates `.env` (from `.env.default`), an empty `utils/aois.py`, `archive/`, and the `data/nisar_*` folders.
 
 
-Start Jupyter with the same environment:
+Optional: Start Jupyter with the same environment:
 
 ```bash
 uv run jupyter lab
