@@ -36,19 +36,19 @@ def main() -> None:
     parser.add_argument(
         "--ed", "--end", dest="end", required=True, help="End Date: YYYY-MM-DD"
     )
-    parser.add_argument("--frequency", choices=["A", "B"], default="A")
+    parser.add_argument("--frequency", choices=["A", "B"], default="B")
     parser.add_argument(
         "--polarization",
         nargs="+",
-        help="One GeoTIFF per polarization, e.g. HH HV. Defaults per product.",
+        help="One GeoTIFF per polarization, e.g. HH, HV, VV, HHHH, HVHV, VVVV. Defaults per product.",
     )
     parser.add_argument(
         "--db", action="store_true", help="Write intensity in dB (GSLC/GCOV only)."
     )
     parser.add_argument(
-        "--full-scene",
+        "--crop",
         action="store_true",
-        help="Write the whole frame instead of cropping to the AOI.",
+        help="Crop the GeoTIFF to the AOI bbox; by default will write the whole scene to disk.",
     )
     parser.add_argument(
         "--keep-h5",
@@ -70,7 +70,7 @@ def main() -> None:
 
     bbox_str = SEARCH_AOIS[args.aoi]["bbox"]
     # Converter expects (min_lon, min_lat, max_lon, max_lat) as floats
-    crop_bbox = None if args.full_scene else [float(v) for v in bbox_str.split(",")]
+    crop_bbox = [float(v) for v in bbox_str.split(",")] if args.crop else None
 
     granules = construct_api_search(
         bbox=bbox_str,

@@ -1,6 +1,8 @@
 # About
 This is a toolbox for searching, downloading, and accessing NISAR data. It began as a local, proof-of-concept exploration of NISAR data. In its current state, it is intended to assist in SkyTruth's incident response work, to facilitate the incorporation of NISAR data into workflows that currently utilize Sentinel-1 or Sentinel-2 imagery.
 
+A general note on the NISAR data processing described below, nisar_access defaults to Frequency B products. These are lower resolution, and also substantially smaller than Frequency A data. The suggested workflow is to search and evaluate on Frequency B data, and only download the Frequency A as needed.
+
 In time, it will hopefully explore access to other less-utilized NASA data products, such as ICESat-2. 
 
 Where possible it prioritizes the use of Rust-based libraries (e.g. polars, pyreqwest, ruff).
@@ -118,9 +120,9 @@ Flags:
 - `--polarization POL [POL ...]`: one GeoTIFF per polarization; defaults per product, polarization options may not be consistent by collection
     - GCOV: `HHHH`, `HVHV`, `VVVV`
     - GSLC/GUNW: `HH`, `HV`
-- `--frequency A|B`: Frequency A products are higher resolution, but also larger files. 
+- `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
 - `--db`: applies to GSLC/GCOV only.
-- `--full-scene`: don't crop to the AOI
+- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
 - `--keep-h5`: by default each `.h5` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
