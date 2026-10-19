@@ -36,11 +36,11 @@ def main() -> None:
     parser.add_argument(
         "--ed", "--end", dest="end", required=True, help="End Date: YYYY-MM-DD"
     )
-    parser.add_argument("--frequency", choices=["A", "B"], default="A")
+    parser.add_argument("--frequency", choices=["A", "B"], default="B")
     parser.add_argument(
         "--polarization",
         nargs="+",
-        help="One GeoTIFF per polarization, e.g. HH HV. Defaults per product.",
+        help="One GeoTIFF per polarization, e.g. HH, HV, VV, HHHH, HVHV, VVVV. Defaults per product.",
     )
     parser.add_argument(
         "--db", action="store_true", help="Write intensity in dB (GSLC/GCOV only)."
