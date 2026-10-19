@@ -1,6 +1,8 @@
 # About
 This is a toolbox for searching, downloading, and accessing NISAR data. It began as a local, proof-of-concept exploration of NISAR data. In its current state, it is intended to assist in SkyTruth's incident response work, to facilitate the incorporation of NISAR data into workflows that currently utilize Sentinel-1 or Sentinel-2 imagery.
 
+A general note on the NISAR data processing described below, nisar_access defaults to Frequency B products. These are lower resolution, and also substantially smaller than Frequency A data. The suggested workflow is to search and evaluate on Frequency B data, and only download the Frequency A as needed.
+
 In time, it will hopefully explore access to other less-utilized NASA data products, such as ICESat-2. 
 
 Where possible it prioritizes the use of Rust-based libraries (e.g. polars, pyreqwest, ruff).
