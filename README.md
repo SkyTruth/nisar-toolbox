@@ -118,9 +118,9 @@ Flags:
 - `--polarization POL [POL ...]`: one GeoTIFF per polarization; defaults per product, polarization options may not be consistent by collection
     - GCOV: `HHHH`, `HVHV`, `VVVV`
     - GSLC/GUNW: `HH`, `HV`
-- `--frequency A|B`: Frequency A products are higher resolution, but also larger files. 
+- `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
 - `--db`: applies to GSLC/GCOV only.
-- `--full-scene`: don't crop to the AOI
+- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
 - `--keep-h5`: by default each `.h5` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
