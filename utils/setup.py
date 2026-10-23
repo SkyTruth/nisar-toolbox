@@ -17,6 +17,9 @@ from utils.variables import (
     NISAR_GEOTIFF_PATH,
     NISAR_H5_PATH,
     REPO_ROOT,
+    ALOS2_GRANULE_CSV_PATH,
+    ALOS2_TIF_PATH,
+    ALOS2_GEOTIFF_PATH,
 )
 
 AOIS_TEMPLATE = """\
@@ -47,7 +50,15 @@ def make_aois() -> None:
 
 
 def make_dirs() -> None:
-    for folder in (ARCHIVE_PATH, GRANULE_CSV_PATH, NISAR_H5_PATH, NISAR_GEOTIFF_PATH):
+    for folder in (
+        ARCHIVE_PATH,
+        GRANULE_CSV_PATH,
+        NISAR_H5_PATH,
+        NISAR_GEOTIFF_PATH,
+        ALOS2_GRANULE_CSV_PATH,
+        ALOS2_TIF_PATH,
+        ALOS2_GEOTIFF_PATH,
+    ):
         if folder.exists():
             print(f"exists:  {folder.relative_to(REPO_ROOT)}")
         else:
