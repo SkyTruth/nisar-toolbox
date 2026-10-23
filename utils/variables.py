@@ -19,6 +19,8 @@ ASF_DATASET = "NISAR"
 ASF_DEFAULT_PROCESSING_LEVEL = "GCOV"
 ASF_DATA_MATURITY = "PROVISIONAL"
 ASF_OUT = "csv"
+# First NISAR GCOV granules on ASF are from mid-Oct 2025 (BETA maturity until Jan 2026, PROVISIONAL after)
+NISAR_ARCHIVE_START = datetime(2025, 10, 1, tzinfo=UTC)
 
 # DATE AND TIME (UTC) OF DATA REQUEST
 REQUEST_DATE = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")

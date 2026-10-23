@@ -154,5 +154,20 @@ Flags:
     - `--out-dir`
     - `--inspect`: print the H5 structure instead of converting
 
+## Find NISAR scenes near slicks
+Given a GeoParquet of slicks (columns `slick`, `slick_timestamp` in UTC, and `geometry`), find every NISAR scene whose footprint overlaps a slick within +/- 24 hours of it. An S2 match file (one row per slick x S2 scene) works as input; it is collapsed to one row per slick, with an `n_s2_matches` count.
+```bash
+uv run python -m src.nisar_slick_search --slicks PATH/TO/SLICKS.parquet
+```
+Flags:
+- `--window-hours`: defaults to 24
+- `--processing-level`: defaults to GCOV
+- `--workers`: concurrent ASF requests, defaults to 8
+- `--out`: output GeoParquet path, defaults to `data/nisar_granule_files/`
+
+Slicks from before NISAR data exists (Oct 2025) are skipped. All data maturities are searched, since most of the Oct 2025 - Jan 2026 archive is BETA rather than PROVISIONAL. Two files are written:
+- a GeoParquet with one row per slick x NISAR scene (slicks with no scene keep one row with empty NISAR columns), including `dt_hours` (NISAR minus slick time), `nisar_coverage_frac` (share of the slick inside the scene footprint), and download and browse-image URLs
+- `..._granules.csv`, the unique matched scenes, which can be passed straight to `src.nisar_dl --granule-file`
+
 # License
 This work is licensed under the Apache License, Version 2.0. See LICENSE
