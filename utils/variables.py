@@ -1,5 +1,5 @@
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -30,6 +30,10 @@ DATA_DIRECTORY = REPO_ROOT / "data"
 GRANULE_CSV_PATH = DATA_DIRECTORY / "nisar_granule_files"
 NISAR_GEOTIFF_PATH = DATA_DIRECTORY / "nisar_geotiffs"
 NISAR_H5_PATH = DATA_DIRECTORY / "nisar_h5_scenes"
+
+ALOS2_GRANULE_CSV_PATH = DATA_DIRECTORY / "alos2_granule_files"
+ALOS2_TIF_PATH = DATA_DIRECTORY / "alos2_tif_scenes"
+ALOS2_GEOTIFF_PATH = DATA_DIRECTORY / "alos2_geotiffs"
 
 # TESTING VARIABLES
 TEST_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/NISAR_L2_GCOV_PROVISIONAL_V1/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001.h5"
@@ -85,3 +89,19 @@ try:
     SEARCH_AOIS |= LOCAL_AOIS
 except ImportError:
     pass
+
+
+# JAXA VARIABLES
+# PALSAR-2 ScanSAR L2.2 on JAXA's public S3 bucket (no credentials needed)
+JAXA_L22_BUCKET_URL = "https://jaxaalos2.s3.us-west-2.amazonaws.com"
+JAXA_L22_PREFIX = "palsar2/L2.2/2025/"  # full global archive, Aug 2014 to present
+# Orbit number grows linearly with time (207 revolutions per 14-day repeat); fit is within +/-9 orbits
+ALOS2_ORBIT_REF_DATE = date(2014, 8, 4)
+ALOS2_ORBIT_REF = 1069
+ALOS2_ORBITS_PER_DAY = 207 / 14
+ALOS2_ORBIT_PAD = 15
+ALOS2_CAL_DB = -83.0  # gamma0 dB = 10*log10(DN^2) - 83
+ALOS2_MODES = ["WBD", "WWD", "WBS", "WWS", "VBD"]
+ALOS2_HH_ONLY_MODES = {"WBS", "WWS"}
+ALOS2_MASK_DROP = (2, 3, 5)  # MSK values: 2 layover, 3 shadow, 5 invalid
+ALOS2_ATTRIBUTION = "©JAXA"
