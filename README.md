@@ -154,20 +154,22 @@ Flags:
     - `--out-dir`
     - `--inspect`: print the H5 structure instead of converting
 
-## Find NISAR scenes near slicks
-Given a GeoParquet of slicks (columns `slick`, `slick_timestamp` in UTC, and `geometry`), find every NISAR scene whose footprint overlaps a slick within +/- 24 hours of it. An S2 match file (one row per slick x S2 scene) works as input; it is collapsed to one row per slick, with an `n_s2_matches` count.
+## Find NISAR and PALSAR-2 scenes near slicks
+Given a GeoParquet of slicks (columns `slick`, `slick_timestamp` in UTC, and `geometry`), find every NISAR and PALSAR-2 scene whose footprint overlaps a slick within +/- 24 hours of it. NISAR is searched through the ASF API; PALSAR-2 ScanSAR L2.2 through JAXA's public S3 bucket, using each scene's STAC item for its footprint and centre time. An S2 match file (one row per slick x S2 scene) works as input: every input row is kept, each slick is searched once, and its scenes are attached to all of its rows, with an `n_s2_matches` count.
 ```bash
 uv run python -m src.nisar_slick_search --slicks PATH/TO/SLICKS.parquet
 ```
 Flags:
+- `--sensors nisar|palsar [...]`: defaults to both
 - `--window-hours`: defaults to 24
-- `--processing-level`: defaults to GCOV
-- `--workers`: concurrent ASF requests, defaults to 8
+- `--processing-level`: NISAR product, defaults to GCOV
+- `--workers`: concurrent ASF requests for NISAR, defaults to 8
 - `--out`: output GeoParquet path, defaults to `data/nisar_granule_files/`
 
-Slicks from before NISAR data exists (Oct 2025) are skipped. All data maturities are searched, since most of the Oct 2025 - Jan 2026 archive is BETA rather than PROVISIONAL. Two files are written:
-- a GeoParquet with one row per slick x NISAR scene (slicks with no scene keep one row with empty NISAR columns), including `dt_hours` (NISAR minus slick time), `nisar_coverage_frac` (share of the slick inside the scene footprint), and download and browse-image URLs
-- `..._granules.csv`, the unique matched scenes, which can be passed straight to `src.nisar_dl --granule-file`
+Every input row is kept in the output, in input order, once per NISAR scene x PALSAR-2 scene of its slick; rows whose slick has no scene from a sensor have empty columns for it. `nisar_search_status` and `palsar_search_status` say whether each slick was `searched`, `failed`, or older than that sensor's data (`before_nisar`: Oct 2025; `before_palsar`: Aug 2014). All NISAR data maturities are searched, since most of the Oct 2025 - Jan 2026 archive is BETA rather than PROVISIONAL. JAXA's L2.2 archive mostly covers land, coasts and polar regions and appears about a month after acquisition, so recent slicks may have no PALSAR-2 scene yet. Three files are written:
+- a GeoParquet including, per sensor, the scene id and time, `nisar_dt_hours` / `palsar_dt_hours` (scene minus slick time), `nisar_coverage_frac` / `palsar_coverage_frac` (share of the slick inside the scene footprint), and download URLs
+- `..._nisar_granules.csv`, the unique NISAR scenes, which can be passed straight to `src.nisar_dl --granule-file`
+- `..._palsar_granules.csv`, the unique PALSAR-2 scenes, which can be passed straight to `src.alos2_dl --granule-file`
 
 # License
 This work is licensed under the Apache License, Version 2.0. See LICENSE
