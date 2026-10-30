@@ -200,6 +200,8 @@ Flags:
 - `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
 
+How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead.
+
 ### Step-by-step runs
 
 1. Search JAXA's S3 archive. Writes a CSV file to `data/alos2_granule_files/`.

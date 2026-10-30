@@ -132,3 +132,10 @@ ALOS2_MODES = ["WBD", "WWD", "WBS", "WWS", "VBD"]
 ALOS2_HH_ONLY_MODES = {"WBS", "WWS"}
 ALOS2_MASK_DROP = (2, 3, 5)  # MSK values: 2 layover, 3 shadow, 5 invalid
 ALOS2_ATTRIBUTION = "©JAXA"
+# L2.2 GeoTIFF pixel size
+ALOS2_PIXEL_SIZE_M = 25
+# Largest crop (output pixels per HH/HV file) that alos2_access reads remotely; bigger crops download whole files.
+# Each polarization is its own file, so both routes scale with the number of polarizations and the limit is per file.
+# Timed at ~24 MB/s from JAXA's bucket: remote ~1.3 s + 0.42 s per Mpx vs ~17 s download + 0.18 s per Mpx convert,
+# so they break even near 65 Mpx per file. 50 Mpx (~175 km box at 25 m) leaves margin for faster downloads.
+ALOS2_REMOTE_MAX_PIXELS = 50_000_000

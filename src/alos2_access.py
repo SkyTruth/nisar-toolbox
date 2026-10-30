@@ -6,7 +6,15 @@ from pyreqwest.exceptions import RequestError
 from src.alos2_convert_to_tiff import convert_scene_to_geotiff
 from src.alos2_dl import URL_COLUMNS, download_scene, file_name
 from src.alos2_search import construct_s3_search
-from utils.variables import ALOS2_GEOTIFF_PATH, ALOS2_MODES, SEARCH_AOIS
+from src.nisar_access import crop_pixels
+from utils.variables import (
+    ALOS2_GEOTIFF_PATH,
+    ALOS2_MODES,
+    ALOS2_PIXEL_SIZE_M,
+    ALOS2_REMOTE_MAX_PIXELS,
+    ALOS2_TIF_PATH,
+    SEARCH_AOIS,
+)
 
 
 def main() -> None:
@@ -50,12 +58,12 @@ def main() -> None:
     parser.add_argument(
         "--crop",
         action="store_true",
-        help="Crop the GeoTIFF to the AOI bbox; by default will write the whole scene to disk.",
+        help="Crop the GeoTIFF to the AOI bbox, reading only that area from JAXA instead of downloading whole files (up to ALOS2_REMOTE_MAX_PIXELS per file); by default will write the whole scene to disk.",
     )
     parser.add_argument(
         "--keep-tif",
         action="store_true",
-        help="Keep each downloaded source .tif after converting (default: delete).",
+        help="Keep each downloaded source .tif after converting (default: delete). HH/HV read remotely with --crop are not downloaded.",
     )
     parser.add_argument(
         "--out-dir",
@@ -69,6 +77,19 @@ def main() -> None:
     bbox_str = SEARCH_AOIS[args.aoi]["bbox"]
     # Converter expects (min_lon, min_lat, max_lon, max_lat) as floats
     crop_bbox = [float(v) for v in bbox_str.split(",")] if args.crop else None
+
+    # Read just the cropped tiles of each HH/HV file over HTTP when the crop is small enough, otherwise
+    # download whole files. Each polarization is its own file, so the limit is per file. The mask (~1 MB)
+    # is always downloaded whole.
+    if args.crop:
+        n_pixels = crop_pixels(crop_bbox, ALOS2_PIXEL_SIZE_M)
+        remote = n_pixels <= ALOS2_REMOTE_MAX_PIXELS
+        reason = f"crop is ~{n_pixels / 1e6:.1f} Mpx per file, limit {ALOS2_REMOTE_MAX_PIXELS / 1e6:.0f} Mpx"
+    else:
+        remote, reason = False, "full scene"
+    print(
+        f"{'Reading only the cropped area of each file remotely' if remote else 'Downloading whole files'} ({reason})"
+    )
 
     granules = construct_s3_search(
         bbox=bbox_str,
@@ -98,10 +119,17 @@ def main() -> None:
                     if not url:
                         print(f"    No {pol} for this scene (HH-only)")
                         continue
-                    src_tif = download_scene(
-                        client, file_name(url), url
-                    )  # skips if already on disk
-                    downloaded.append(src_tif)
+                    local_tif = ALOS2_TIF_PATH / f"{file_name(url)}.tif"
+                    if remote and local_tif.exists():
+                        # Already on disk (e.g. from --keep-tif); reading locally beats going remote
+                        src_tif = local_tif
+                    elif remote:
+                        src_tif = url
+                    else:
+                        src_tif = download_scene(
+                            client, file_name(url), url
+                        )  # skips if already on disk
+                        downloaded.append(src_tif)
                     tifs.append(
                         convert_scene_to_geotiff(
                             src_tif,
