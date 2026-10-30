@@ -85,3 +85,19 @@ try:
     SEARCH_AOIS |= LOCAL_AOIS
 except ImportError:
     pass
+
+# AOIs given as "point" (lon,lat) + "buffer_km" get their bbox from the point; it takes precedence over any "bbox"
+if any("point" in aoi for aoi in SEARCH_AOIS.values()):
+    # geopandas is slow to import, so only load it when an AOI needs it
+    from utils.generate_aoi_details import point_to_bbox
+
+    for name, aoi in SEARCH_AOIS.items():
+        if "point" in aoi:
+            if "buffer_km" not in aoi:
+                raise ValueError(f'AOI "{name}" has a "point" but no "buffer_km"')
+            lon, lat = (float(v) for v in aoi["point"].split(","))
+            aoi["bbox"] = point_to_bbox(lon, lat, aoi["buffer_km"])
+
+for name, aoi in SEARCH_AOIS.items():
+    if "bbox" not in aoi:
+        raise ValueError(f'AOI "{name}" needs a "bbox", or a "point" and "buffer_km"')

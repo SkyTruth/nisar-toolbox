@@ -48,12 +48,12 @@ def main() -> None:
     parser.add_argument(
         "--crop",
         action="store_true",
-        help="Crop the GeoTIFF to the AOI bbox; by default will write the whole scene to disk.",
+        help="Crop the GeoTIFF to the AOI bbox, reading only that area from ASF instead of downloading the whole .h5; by default will write the whole scene to disk.",
     )
     parser.add_argument(
         "--keep-h5",
         action="store_true",
-        help="Keep each .h5 after converting (default: delete).",
+        help="Keep each .h5 after converting (default: delete). Ignored with --crop, which downloads no .h5.",
     )
     parser.add_argument(
         "--out-dir",
@@ -92,9 +92,14 @@ def main() -> None:
         for i, (granule_name, url) in enumerate(scenes.iter_rows(), start=1):
             print(f"\n[{i}/{scenes.height}] {granule_name}")
             try:
-                h5 = download_scene(
-                    client, granule_name, url
-                )  # skips if already on disk
+                # --crop reads just the AOI from the remote .h5; otherwise download the whole file
+                h5 = (
+                    url
+                    if args.crop
+                    else download_scene(
+                        client, granule_name, url
+                    )  # skips if already on disk
+                )
                 for pol in args.polarization or [None]:
                     tifs.append(
                         convert_scene_to_geotiff(
@@ -108,7 +113,7 @@ def main() -> None:
                         )
                     )
                 # Only reached if every polarization converted
-                if not args.keep_h5:
+                if not args.crop and not args.keep_h5:
                     h5.unlink()
 
             # Same failure types the standalone batch loops catch, so one bad scene doesn't stop the run

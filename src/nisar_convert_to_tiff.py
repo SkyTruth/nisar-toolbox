@@ -1,6 +1,10 @@
 import argparse
-from pathlib import Path
+from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlparse
 
+import aiohttp
+import fsspec
 import h5py
 import numpy as np
 import rasterio
@@ -10,7 +14,44 @@ from rasterio.warp import transform_bounds
 from rasterio.windows import Window, from_bounds
 from rasterio.windows import transform as window_transform
 
-from utils.variables import NISAR_GEOTIFF_PATH, NISAR_H5_PATH, NISAR_PROCESSING_INFO
+from utils.variables import (
+    EARTHDATA_TOKEN,
+    NISAR_GEOTIFF_PATH,
+    NISAR_H5_PATH,
+    NISAR_PROCESSING_INFO,
+)
+
+# NISAR .h5 files use 4 MiB file-space pages, so remote reads fetch whole pages
+REMOTE_BLOCK_SIZE = 4 << 20
+
+
+def is_url(source) -> bool:
+    return str(source).startswith(("http://", "https://"))
+
+
+@contextmanager
+def open_h5(source):
+    """Open a local .h5, or a remote one over HTTP (only the byte ranges actually read are fetched)."""
+    if not is_url(source):
+        with h5py.File(source, "r") as src:
+            yield src
+        return
+
+    if not EARTHDATA_TOKEN:
+        raise RuntimeError("EARTHDATA_TOKEN is not set; add it to .env")
+    fs = fsspec.filesystem(
+        "https",
+        client_kwargs={"headers": {"Authorization": f"Bearer {EARTHDATA_TOKEN}"}},
+    )
+    try:
+        with (
+            fs.open(source, block_size=REMOTE_BLOCK_SIZE, cache_type="blockcache") as f,
+            h5py.File(f, "r") as src,
+        ):
+            yield src
+    # e.g. 401 from an expired token; RuntimeError like download_scene, so batch loops record it and move on
+    except aiohttp.ClientResponseError as exc:
+        raise RuntimeError(f"{exc.status} {exc.message} for {source}") from exc
 
 
 def to_output(block, db: bool = False):
@@ -32,7 +73,7 @@ def show(name, obj):
 
 
 def convert_scene_to_geotiff(
-    h5_path: Path,
+    h5_path: Path | str,
     frequency: str = "A",
     polarization: str | None = None,
     remove_h5: bool = False,
@@ -43,19 +84,26 @@ def convert_scene_to_geotiff(
 ) -> Path:
     """
     Convert a single, specified h5 file to GeoTIFF.
+    h5_path can also be an ASF download URL, read remotely without downloading the whole file
+    (worthwhile with a bbox, since only the cropped area is fetched).
     """
 
-    # Use path as given, look in NISAR_H5_PATH otherwise
-    h5_path = Path(h5_path)
-    if not h5_path.exists():
-        h5_path = NISAR_H5_PATH / h5_path.name
+    remote = is_url(h5_path)
+    if not remote:
+        # Use path as given, look in NISAR_H5_PATH otherwise
+        h5_path = Path(h5_path)
+        if not h5_path.exists():
+            h5_path = NISAR_H5_PATH / h5_path.name
 
-    # Check the h5 file exists
-    if not h5_path.exists():
-        raise FileNotFoundError(f"{h5_path} not found; download it first")
+        # Check the h5 file exists
+        if not h5_path.exists():
+            raise FileNotFoundError(f"{h5_path} not found; download it first")
+
+    # Granule name from the file name, local or in the URL
+    granule_name = PurePosixPath(urlparse(str(h5_path)).path).stem
 
     # Determine NISAR Processing Level from granule dile name
-    processing_level = h5_path.stem.split("_")[3]
+    processing_level = granule_name.split("_")[3]
 
     if processing_level not in NISAR_PROCESSING_INFO:
         raise ValueError(f"No information defined for {processing_level}")
@@ -79,7 +127,7 @@ def convert_scene_to_geotiff(
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{h5_path.stem}_{suffix}.tif"
+    out_path = out_dir / f"{granule_name}_{suffix}.tif"
 
     if out_path.exists():
         print(f"    Skipping {out_path.name} (already exists)")
@@ -88,7 +136,7 @@ def convert_scene_to_geotiff(
     # Write to a partial file so a failed conversion never looks complete
     part = out_path.with_suffix(".tif.part")
     try:
-        with h5py.File(h5_path, "r") as src:
+        with open_h5(h5_path) as src:
             grid = src[data_specs["grid"].format(**names)]
             data = grid[data_specs["dataset"].format(**names)]
 
@@ -114,7 +162,7 @@ def convert_scene_to_geotiff(
                         .intersection(full)
                     )
                 except rasterio.errors.WindowError:
-                    raise ValueError(f"bbox {bbox} does not overlap {h5_path.name}")
+                    raise ValueError(f"bbox {bbox} does not overlap {granule_name}")
             else:
                 win = full
             h, w = int(win.height), int(win.width)
@@ -161,7 +209,7 @@ def convert_scene_to_geotiff(
 
     part.replace(out_path)
 
-    if remove_h5:
+    if remove_h5 and not remote:
         h5_path.unlink()
 
     return out_path
@@ -183,7 +231,7 @@ def convert_scenes_to_geotiff(
     tifs: list[Path] = []
     failures: list[tuple[str, str]] = []
     for i, h5_path in enumerate(h5_paths, start=1):
-        name = Path(h5_path).name
+        name = PurePosixPath(urlparse(str(h5_path)).path).name
         print(f"Converting {i}/{len(h5_paths)} {name}")
         try:
             tifs.append(
@@ -223,7 +271,7 @@ def main():
         dest="h5",
         nargs="+",
         required=True,
-        help="One or more .h5 files or granule names (looked up in data/nisar_h5_scenes/).",
+        help="One or more .h5 files or granule names (looked up in data/nisar_h5_scenes/), or ASF download URLs (read remotely; use with --bbox).",
     )
     parser.add_argument("--frequency", choices=["A", "B"], default="A")
     parser.add_argument(
