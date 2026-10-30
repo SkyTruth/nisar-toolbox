@@ -1,8 +1,13 @@
 import argparse
+import io
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import redirect_stdout
+from pathlib import Path
 
 from pyreqwest.client import SyncClientBuilder
 from pyreqwest.exceptions import RequestError
 from rasterio.warp import transform_bounds
+from tqdm import tqdm
 
 from src.asf_sar_search import construct_api_search
 from src.nisar_convert_to_tiff import convert_scene_to_geotiff
@@ -27,6 +32,61 @@ def crop_pixels(bbox: list[float], pixel_size_m: float) -> int:
     epsg = (32600 if lat >= 0 else 32700) + int((lon + 180) // 6) + 1
     west, south, east, north = transform_bounds("EPSG:4326", f"EPSG:{epsg}", *bbox)
     return round((east - west) / pixel_size_m) * round((north - south) / pixel_size_m)
+
+
+def process_scene(
+    granule_name: str,
+    url: str,
+    remote: bool,
+    crop_bbox: list[float] | None,
+    args: argparse.Namespace,
+) -> tuple[list[Path], str | None, str]:
+    """
+    Read (remote) or download, then convert one scene. Runs in a worker process, so its printed output is
+    captured and returned with the GeoTIFFs written and the error (None if it succeeded).
+    """
+    tifs: list[Path] = []
+    output = io.StringIO()
+    with redirect_stdout(output):
+        try:
+            local_h5 = NISAR_H5_PATH / f"{granule_name}.h5"
+            if remote and local_h5.exists():
+                # Already on disk (e.g. from --keep-h5); reading locally beats going remote
+                h5 = local_h5
+            elif remote:
+                h5 = url
+            else:
+                with SyncClientBuilder().build() as client:
+                    h5 = download_scene(
+                        client, granule_name, url
+                    )  # skips if already on disk
+            for pol in args.polarization or [None]:
+                tifs.append(
+                    convert_scene_to_geotiff(
+                        h5,
+                        frequency=args.frequency,
+                        polarization=pol,
+                        db=args.db,
+                        bbox=crop_bbox,
+                        aoi_name=args.aoi,
+                        out_dir=args.out_dir,
+                    )
+                )
+            # Only reached if every polarization converted; a local .h5 used in remote mode is left alone
+            if not remote and not args.keep_h5:
+                h5.unlink()
+
+        # Same failure types the standalone batch loops catch, so one bad scene doesn't stop the run
+        except (
+            RequestError,
+            RuntimeError,
+            OSError,
+            KeyError,
+            ValueError,
+            IndexError,
+        ) as exc:
+            return tifs, str(exc), output.getvalue()
+    return tifs, None, output.getvalue()
 
 
 def main() -> None:
@@ -76,7 +136,16 @@ def main() -> None:
         default=NISAR_GEOTIFF_PATH,
         help=f"Folder to write GeoTIFFs to; created if missing. Defaults to {NISAR_GEOTIFF_PATH}.",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Scenes processed in parallel (default: 4). Speeds up remote reads near-linearly; whole-file "
+        "downloads share bandwidth, so gain little and each needs ~6 GB of disk at once.",
+    )
     args = parser.parse_args()
+    if args.workers < 1:
+        parser.error("--workers must be at least 1")
 
     # download_scene doesn't check the token itself, so fail before searching
     if not EARTHDATA_TOKEN:
@@ -125,49 +194,35 @@ def main() -> None:
         f"\n{scenes.height} scenes found for {args.aoi} ({args.product}, {args.start} to {args.end})"
     )
 
+    # Scenes run in parallel worker processes (h5py serializes threads); each prints when it finishes,
+    # above a progress bar of scenes done (bar.write keeps the bar at the bottom)
     tifs: list = []
     failures: list[tuple[str, str]] = []
-    with SyncClientBuilder().build() as client:
-        for i, (granule_name, url) in enumerate(scenes.iter_rows(), start=1):
-            print(f"\n[{i}/{scenes.height}] {granule_name}")
-            try:
-                local_h5 = NISAR_H5_PATH / f"{granule_name}.h5"
-                if remote and local_h5.exists():
-                    # Already on disk (e.g. from --keep-h5); reading locally beats going remote
-                    h5 = local_h5
-                elif remote:
-                    h5 = url
-                else:
-                    h5 = download_scene(
-                        client, granule_name, url
-                    )  # skips if already on disk
-                for pol in args.polarization or [None]:
-                    tifs.append(
-                        convert_scene_to_geotiff(
-                            h5,
-                            frequency=args.frequency,
-                            polarization=pol,
-                            db=args.db,
-                            bbox=crop_bbox,
-                            aoi_name=args.aoi,
-                            out_dir=args.out_dir,
-                        )
-                    )
-                # Only reached if every polarization converted; a local .h5 used in remote mode is left alone
-                if not remote and not args.keep_h5:
-                    h5.unlink()
-
-            # Same failure types the standalone batch loops catch, so one bad scene doesn't stop the run
-            except (
-                RequestError,
-                RuntimeError,
-                OSError,
-                KeyError,
-                ValueError,
-                IndexError,
-            ) as exc:
-                print(f"  FAILED: {exc}")
-                failures.append((granule_name, str(exc)))
+    with (
+        ProcessPoolExecutor(max_workers=args.workers) as pool,
+        tqdm(
+            total=scenes.height,
+            desc=f"Scenes ({args.workers} workers)",
+            unit="scene",
+        ) as bar,
+    ):
+        futures = {
+            pool.submit(
+                process_scene, granule_name, url, remote, crop_bbox, args
+            ): granule_name
+            for granule_name, url in scenes.iter_rows()
+        }
+        for future in as_completed(futures):
+            granule_name = futures[future]
+            scene_tifs, error, output = future.result()
+            bar.write(f"\n[{bar.n + 1}/{scenes.height}] {granule_name}")
+            if output:
+                bar.write(output.rstrip("\n"))
+            tifs += scene_tifs
+            if error:
+                bar.write(f"  FAILED: {error}")
+                failures.append((granule_name, error))
+            bar.update()
 
     print(f"\nDone. {len(tifs)} GeoTIFFs written, {len(failures)} scenes failed.")
     for name, err in failures:
