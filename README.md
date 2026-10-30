@@ -126,8 +126,19 @@ Flags:
     - GSLC/GUNW: `HH`, `HV`
 - `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
 - `--db`: applies to GSLC/GCOV only.
-- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene). Only the AOI is read from ASF over HTTP, so the full `.h5` (several GB) is never downloaded; a 20 km AOI is roughly 50-100 MB per scene.
-- `--keep-h5`: by default each `.h5` is deleted after converting (no effect with `--crop`, which downloads no `.h5`)
+- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene).
+- `--keep-h5`: by default each downloaded `.h5` is deleted after converting
+
+How the data is fetched: each `.h5` is several GB, but `nisar_access` only needs one band from it. When that band is small, it is read directly from ASF over HTTP instead of downloading the whole file:
+
+For GCOV, the switch is the number of pixels read: output pixels (crop or full scene, at 10 m for frequency A or 80 m for B) × number of polarizations. Up to 60 Mpx the bands are read remotely; above that the whole `.h5` is downloaded.
+
+| GCOV, one polarization | `--crop` (20 km AOI) | uncropped |
+|---|---|---|
+| Frequency A | ~4 Mpx: read remotely (~15 s/scene) | ~1,100 Mpx: download whole `.h5` (~80-100 s/scene) |
+| Frequency B | ~0.06 Mpx: read remotely (~6 s/scene) | ~18 Mpx: read remotely (~12 s/scene) |
+
+Remote reads are many small sequential requests, so their time grows with the pixels read: about 10 s + 0.9 s per million pixels (a 50 km AOI at frequency A is ~25 Mpx, ~40 s), versus ~80-100 s to download a whole `.h5` whatever is used from it. The crossover is near 80 Mpx; the 60 Mpx limit is `NISAR_REMOTE_MAX_PIXELS` in `utils/variables.py`. Times are from test scenes at ~65 MB/s. Other products read crops remotely and download full scenes. If a scene's `.h5` is already in `data/nisar_h5_scenes/` (e.g. from `--keep-h5`), it is used instead.
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
 ### Step-by-step runs

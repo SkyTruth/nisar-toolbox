@@ -2,6 +2,7 @@ import argparse
 
 from pyreqwest.client import SyncClientBuilder
 from pyreqwest.exceptions import RequestError
+from rasterio.warp import transform_bounds
 
 from src.asf_sar_search import construct_api_search
 from src.nisar_convert_to_tiff import convert_scene_to_geotiff
@@ -9,10 +10,23 @@ from src.nisar_dl import download_scene
 from utils.variables import (
     ASF_DEFAULT_PROCESSING_LEVEL,
     EARTHDATA_TOKEN,
+    NISAR_GCOV_PIXEL_SIZE_M,
+    NISAR_GCOV_SCENE_SIZE_M,
     NISAR_GEOTIFF_PATH,
+    NISAR_H5_PATH,
     NISAR_PROCESSING_INFO,
+    NISAR_REMOTE_MAX_PIXELS,
     SEARCH_AOIS,
 )
+
+
+def crop_pixels(bbox: list[float], pixel_size_m: float) -> int:
+    """Approximate output pixels for a lon/lat bbox, measured in the UTM zone of its center (as NISAR grids are)."""
+    lon = (bbox[0] + bbox[2]) / 2
+    lat = (bbox[1] + bbox[3]) / 2
+    epsg = (32600 if lat >= 0 else 32700) + int((lon + 180) // 6) + 1
+    west, south, east, north = transform_bounds("EPSG:4326", f"EPSG:{epsg}", *bbox)
+    return round((east - west) / pixel_size_m) * round((north - south) / pixel_size_m)
 
 
 def main() -> None:
@@ -53,7 +67,7 @@ def main() -> None:
     parser.add_argument(
         "--keep-h5",
         action="store_true",
-        help="Keep each .h5 after converting (default: delete). Ignored with --crop, which downloads no .h5.",
+        help="Keep each downloaded .h5 after converting (default: delete). Only applies when the whole .h5 is downloaded (GCOV reads above NISAR_REMOTE_MAX_PIXELS, e.g. uncropped frequency A, or uncropped non-GCOV products).",
     )
     parser.add_argument(
         "--out-dir",
@@ -71,6 +85,31 @@ def main() -> None:
     bbox_str = SEARCH_AOIS[args.aoi]["bbox"]
     # Converter expects (min_lon, min_lat, max_lon, max_lat) as floats
     crop_bbox = [float(v) for v in bbox_str.split(",")] if args.crop else None
+
+    # Read just the needed band(s) from the remote .h5 when that's small, otherwise download the whole file.
+    # Remote reads are many small sequential requests, so their time grows with the pixels read (output size x
+    # polarizations), while a whole-file download costs the same however many bands are used.
+    polarizations = args.polarization or [None]
+    if args.product == "GCOV":
+        pixel_size_m = NISAR_GCOV_PIXEL_SIZE_M[args.frequency]
+        band_pixels = (
+            crop_pixels(crop_bbox, pixel_size_m)
+            if args.crop
+            else round(NISAR_GCOV_SCENE_SIZE_M / pixel_size_m) ** 2
+        )
+        n_pixels = band_pixels * len(polarizations)
+        remote = n_pixels <= NISAR_REMOTE_MAX_PIXELS
+        reason = (
+            f"~{band_pixels / 1e6:.1f} Mpx x {len(polarizations)} polarization(s) = {n_pixels / 1e6:.1f} Mpx, "
+            f"limit {NISAR_REMOTE_MAX_PIXELS / 1e6:.0f} Mpx"
+        )
+    else:
+        # Only GCOV has been timed; other products read crops remotely and download full scenes
+        remote = args.crop
+        reason = f"{args.product} {'crop' if args.crop else 'full scene'}"
+    print(
+        f"{'Reading only the needed band(s) remotely' if remote else 'Downloading each whole .h5'} ({reason})"
+    )
 
     granules = construct_api_search(
         bbox=bbox_str,
@@ -92,14 +131,16 @@ def main() -> None:
         for i, (granule_name, url) in enumerate(scenes.iter_rows(), start=1):
             print(f"\n[{i}/{scenes.height}] {granule_name}")
             try:
-                # --crop reads just the AOI from the remote .h5; otherwise download the whole file
-                h5 = (
-                    url
-                    if args.crop
-                    else download_scene(
+                local_h5 = NISAR_H5_PATH / f"{granule_name}.h5"
+                if remote and local_h5.exists():
+                    # Already on disk (e.g. from --keep-h5); reading locally beats going remote
+                    h5 = local_h5
+                elif remote:
+                    h5 = url
+                else:
+                    h5 = download_scene(
                         client, granule_name, url
                     )  # skips if already on disk
-                )
                 for pol in args.polarization or [None]:
                     tifs.append(
                         convert_scene_to_geotiff(
@@ -112,8 +153,8 @@ def main() -> None:
                             out_dir=args.out_dir,
                         )
                     )
-                # Only reached if every polarization converted
-                if not args.crop and not args.keep_h5:
+                # Only reached if every polarization converted; a local .h5 used in remote mode is left alone
+                if not remote and not args.keep_h5:
                     h5.unlink()
 
             # Same failure types the standalone batch loops catch, so one bad scene doesn't stop the run

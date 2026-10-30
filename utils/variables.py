@@ -35,6 +35,17 @@ NISAR_H5_PATH = DATA_DIRECTORY / "nisar_h5_scenes"
 TEST_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/NISAR_L2_GCOV_PROVISIONAL_V1/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001.h5"
 TEST_XML_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/NISAR_L2_GCOV_PROVISIONAL_V1/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001.h5.iso.xml"
 
+# REMOTE READS vs WHOLE-FILE DOWNLOADS
+# GCOV grid pixel size per frequency (from the product files)
+NISAR_GCOV_PIXEL_SIZE_M = {"A": 10, "B": 80}
+# Nominal GCOV frame width/height, for sizing uncropped reads (ASF search results have no NISAR footprint);
+# measured frames were 4122 x 4221 and 4113 x 4203 pixels at 80 m
+NISAR_GCOV_SCENE_SIZE_M = 335_000
+# Most pixels (output pixels x polarizations) that nisar_access reads remotely; more downloads the whole .h5.
+# Timed on GCOV frequency A at ~65 MB/s: remote ~10 s + 0.9 s per Mpx vs ~80-95 s for the whole file,
+# so they break even near 80 Mpx. 60 Mpx (~77 km box at 10 m, one polarization) leaves margin for faster downloads.
+NISAR_REMOTE_MAX_PIXELS = 60_000_000
+
 # NISAR PROCESSING DATA (where each product's data lives inside the .h5, how to name the output, and its nodata value)
 NISAR_PROCESSING_INFO = {
     "GSLC": {
