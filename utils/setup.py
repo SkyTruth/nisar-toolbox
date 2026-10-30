@@ -12,14 +12,14 @@ Creates any files or directories that are missing (or needed .git-ignores). Will
 import shutil
 
 from utils.variables import (
+    ALOS2_GEOTIFF_PATH,
+    ALOS2_GRANULE_CSV_PATH,
+    ALOS2_TIF_PATH,
     ARCHIVE_PATH,
     GRANULE_CSV_PATH,
     NISAR_GEOTIFF_PATH,
     NISAR_H5_PATH,
     REPO_ROOT,
-    ALOS2_GRANULE_CSV_PATH,
-    ALOS2_TIF_PATH,
-    ALOS2_GEOTIFF_PATH,
 )
 
 AOIS_TEMPLATE = """\
