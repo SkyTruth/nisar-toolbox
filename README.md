@@ -3,6 +3,8 @@ This is a toolbox for searching, downloading, and accessing NISAR data. It began
 
 A general note on the NISAR data processing described below, nisar_access defaults to Frequency B products. These are lower resolution, and also substantially smaller than Frequency A data. The suggested workflow is to search and evaluate on Frequency B data, and only download the Frequency A as needed.
 
+It also supports ALOS-2 PALSAR-2 ScanSAR L2.2 imagery from JAXA's public S3 bucket (no login needed); see PALSAR-2 Data Access below.
+
 In time, it will hopefully explore access to other less-utilized NASA data products, such as ICESat-2. 
 
 Where possible it prioritizes the use of Rust-based libraries (e.g. polars, pyreqwest, ruff).
@@ -24,7 +26,7 @@ uv sync --locked
 ```bash
 uv run python -m utils.setup
 ```
-This creates `.env` (from `.env.default`), an empty `utils/aois.py`, `archive/`, and the `data/nisar_*` folders.
+This creates `.env` (from `.env.default`), an empty `utils/aois.py`, `archive/`, and the `data/nisar_*` and `data/alos2_*` folders.
 
 
 Optional: Start Jupyter with the same environment:
@@ -39,12 +41,15 @@ the interpreter under `.venv`.
 
 # Repository Structure
 
-- `src/`: search / download / convert tools, run as modules (see NISAR Data Access)
+- `src/`: search / download / convert tools, run as modules (see NISAR Data Access and PALSAR-2 Data Access)
 - `utils/aois.py`: private AOIs (git-ignored)
 - `utils/generate_aoi_details.py`: interactive helper that builds an AOI entry
 - `utils/setup.py`: one-time setup; creates `.env`, `utils/aois.py`, `archive/`, and the `data/` folders if missing
-- `utils/variables.py`: shared constants: ASF settings, data paths, per-product H5 layouts, `.env` loading
+- `utils/variables.py`: shared constants: ASF settings, data paths, per-product H5 layouts, `.env` loading, JAXA/PALSAR-2 settings
 - `data/`: git-ignored except `.gitkeep`
+  - `alos2_geotiffs/`: converted PALSAR-2 gamma0 GeoTIFFs
+  - `alos2_granule_files/`: granule CSVs from JAXA S3 searches
+  - `alos2_tif_scenes/`: downloaded PALSAR-2 source `.tif` scenes
   - `earth_access_tests/`, `other_data/`: samples for other explorations
   - `nisar_geotiffs/`: converted GeoTIFFs
   - `nisar_granule_files/`: granule CSVs from ASF searches
@@ -153,6 +158,60 @@ Flags:
     - `--remove-h5`
     - `--out-dir`
     - `--inspect`: print the H5 structure instead of converting
+
+# PALSAR-2 Data Access
+ALOS-2 PALSAR-2 ScanSAR L2.2 scenes (Aug 2014 to present) are read from JAXA's public S3 bucket, so no credentials are needed. Searches use the same AOIs as NISAR (see Define AOIs above). All commands below must be run from the repository root.
+
+JAXA's free ScanSAR archive mostly covers tropical land, coasts and polar regions; open ocean and much of the US, Europe and the Middle East are rarely or never observed, so an empty search is common outside those areas.
+
+Any product or figure using this data must credit JAXA (see: `ALOS2_ATTRIBUTION` in `utils/variables.py`).
+
+## Beam Modes
+- `WBD`, `WWD`, `VBD`: HH and HV
+- `WBS`, `WWS`: HH only; HV is skipped for these scenes
+
+
+## Search, download, and convert PALSAR-2 data
+
+```bash
+uv run python -m src.alos2_access --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
+```
+Flags:
+- `--mode MODE [MODE ...]`: only these beam modes (defaults to all)
+- `--polarization POL [POL ...]`: `HH` and/or `HV`, one GeoTIFF per polarization (defaults to both)
+- `--db`: write gamma0 in dB
+- `--mask`: set layover, shadow and invalid pixels to NaN (also downloads each scene's `_MSK.tif`)
+- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
+- `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
+- `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
+
+### Step-by-step runs
+
+1. Search JAXA's S3 archive. Writes a CSV file to `data/alos2_granule_files/`.
+    ```bash
+    uv run python -m src.alos2_search --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
+    ```
+    OR use an ad-hoc bbox, with an optional `--location` label in the filename:
+    ```bash
+    uv run python -m src.alos2_search --bbox 'MIN_LON,MIN_LAT,MAX_LON,MAX_LAT' --location LABEL --sd YYYY-MM-DD --ed YYYY-MM-DD
+    ```
+    `--mode MODE [MODE ...]` limits the search to those beam modes.
+2. Download the PALSAR-2 scenes to `data/alos2_tif_scenes/`. Scenes already on disk are skipped.
+    ```bash
+    uv run python -m src.alos2_dl --granule-file GRANULE_LIST.csv
+    ```
+    `--granule-file` is required; a bare filename is looked up in `data/alos2_granule_files/`. `--granule NAME [NAME ...]` downloads only those granules from the CSV. `--polarization` picks `HH` and/or `HV` (defaults to both). `--mask` also downloads each scene's `_MSK.tif`, needed for `--mask` at conversion.
+3. Convert the source tifs (DN) to calibrated gamma0 GeoTIFFs in `data/alos2_geotiffs/`. A bare filename is looked up in `data/alos2_tif_scenes/`.
+    ```bash
+    uv run python -m src.alos2_convert_to_tiff --tif SCENE_HH_SLP.tif [SCENE_HV_SLP.tif ...]
+    ```
+    Flags:
+    - `--db`
+    - `--mask`: needs the scene's `_MSK.tif` (download it with `src.alos2_dl --mask`)
+    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop
+    - `--remove-tif`
+    - `--out-dir`
+    - `--inspect`: print the tif's profile and tags instead of converting
 
 # License
 This work is licensed under the Apache License, Version 2.0. See LICENSE
