@@ -1,7 +1,8 @@
 import argparse
 import re
 from contextlib import nullcontext
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlparse
 
 import numpy as np
 import rasterio
@@ -10,7 +11,7 @@ from rasterio.warp import transform_bounds
 from rasterio.windows import Window, from_bounds
 from rasterio.windows import transform as window_transform
 
-from src.nisar_convert_to_tiff import to_output
+from src.nisar_convert_to_tiff import is_url, to_output
 from utils.variables import (
     ALOS2_ATTRIBUTION,
     ALOS2_CAL_DB,
@@ -23,6 +24,16 @@ from utils.variables import (
 L22_FILE_RE = re.compile(r"(ALOS2\d{9}-\d{6}_\w{3}[RL]2\.2GU[AD])_(HH|HV)_SLP")
 CAL_LINEAR = np.float32(10 ** (ALOS2_CAL_DB / 10))
 
+# GDAL settings for reading JAXA's Cloud-Optimized GeoTIFFs over HTTP: skip directory listings,
+# and merge/multiplex the tile range requests
+REMOTE_GDAL_ENV = {
+    "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+    "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
+    "GDAL_HTTP_MERGE_CONSECUTIVE_RANGES": "YES",
+    "GDAL_HTTP_MULTIPLEX": "YES",
+    "GDAL_HTTP_VERSION": "2",
+}
+
 
 def dn_to_gamma0(block):
     """uint16 DN -> linear gamma0 (DN^2 * 10^-8.3); DN 0 is nodata."""
@@ -33,7 +44,7 @@ def dn_to_gamma0(block):
 
 
 def convert_scene_to_geotiff(
-    tif_path: Path,
+    tif_path: Path | str,
     remove_tif: bool = False,
     db: bool = False,
     mask: bool = False,
@@ -43,24 +54,31 @@ def convert_scene_to_geotiff(
 ) -> Path:
     """
     Convert a single, specified PALSAR-2 L2.2 HH/HV GeoTIFF (DN) to a calibrated gamma0 GeoTIFF.
+    tif_path can also be a JAXA download URL, read remotely without downloading the whole file
+    (worthwhile with a bbox, since only the cropped tiles are fetched). The mask is always a local file.
     """
 
-    # Use path as given, look in ALOS2_TIF_PATH otherwise
-    tif_path = Path(tif_path)
-    if not tif_path.exists():
-        tif_path = ALOS2_TIF_PATH / tif_path.name
+    remote = is_url(tif_path)
+    if not remote:
+        # Use path as given, look in ALOS2_TIF_PATH otherwise
+        tif_path = Path(tif_path)
+        if not tif_path.exists():
+            tif_path = ALOS2_TIF_PATH / tif_path.name
 
-    # Check the tif file exists
-    if not tif_path.exists():
-        raise FileNotFoundError(f"{tif_path} not found; download it first")
+        # Check the tif file exists
+        if not tif_path.exists():
+            raise FileNotFoundError(f"{tif_path} not found; download it first")
 
-    # Determine scene and polarization from the file name
-    m = L22_FILE_RE.fullmatch(tif_path.stem)
+    # Determine scene and polarization from the file name, local or in the URL
+    stem = PurePosixPath(urlparse(str(tif_path)).path).stem
+    m = L22_FILE_RE.fullmatch(stem)
     if m is None:
-        raise ValueError(f"{tif_path.name} is not a PALSAR-2 L2.2 HH/HV file")
+        raise ValueError(f"{stem} is not a PALSAR-2 L2.2 HH/HV file")
     scene_id, polarization = m.groups()
 
-    mask_path = tif_path.with_name(f"{scene_id}_MSK.tif")
+    # Mask sits next to a local tif; for a remote tif it's downloaded to ALOS2_TIF_PATH
+    mask_dir = ALOS2_TIF_PATH if remote else tif_path.parent
+    mask_path = mask_dir / f"{scene_id}_MSK.tif"
     if mask and not mask_path.exists():
         raise FileNotFoundError(
             f"{mask_path.name} not found; download it with alos2_dl --mask"
@@ -77,7 +95,7 @@ def convert_scene_to_geotiff(
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{tif_path.stem}_{suffix}.tif"
+    out_path = out_dir / f"{stem}_{suffix}.tif"
 
     if out_path.exists():
         print(f"    Skipping {out_path.name} (already exists)")
@@ -87,7 +105,8 @@ def convert_scene_to_geotiff(
     part = out_path.with_suffix(".tif.part")
     try:
         with (
-            rasterio.open(tif_path) as src,
+            rasterio.Env(**REMOTE_GDAL_ENV) if remote else nullcontext(),
+            rasterio.open(f"/vsicurl/{tif_path}" if remote else tif_path) as src,
             rasterio.open(mask_path) if mask else nullcontext() as msk,
         ):
             # Full grid, or just the bbox (reprojected into the scene's UTM CRS)
@@ -102,7 +121,7 @@ def convert_scene_to_geotiff(
                         .intersection(full)
                     )
                 except rasterio.errors.WindowError:
-                    raise ValueError(f"bbox {bbox} does not overlap {tif_path.name}")
+                    raise ValueError(f"bbox {bbox} does not overlap {stem}")
             else:
                 win = full
             h, w = int(win.height), int(win.width)
@@ -160,7 +179,7 @@ def convert_scene_to_geotiff(
 
     part.replace(out_path)
 
-    if remove_tif:
+    if remove_tif and not remote:
         tif_path.unlink()
 
     return out_path

@@ -104,7 +104,11 @@ The code in this repo requires an Earthdata access token. Tokens last 60 days. T
 6. In the `.env` set the `EARTHDATA_TOKEN_DATE` to the date the token was generated
 
 ## Define AOIs
-The search and download features of this repository depend on AOIs, currently defined by bounding boxes. AOI information should be stored in the git-ignored `utils/aois.py`. A few test AOIs (wva-test-area, drc-test-area, indian-ocean-test-area) defined in utils/variables.py are always available; an AOI in aois.py with the same name overrides them. Entry format: `"aoi-name": {"bbox": "min_lon,min_lat,max_lon,max_lat"},`. You can append the file directly following that format, or you can run the following code to generate one from bounds or a point plus a km buffer:
+The search and download features of this repository depend on AOIs, currently defined by bounding boxes. AOI information should be stored in the git-ignored `utils/aois.py`. A few test AOIs (wva-test-area, drc-test-area, indian-ocean-test-area) defined in utils/variables.py are always available; an AOI in aois.py with the same name overrides them. Entry format, either a bounding box or a point with a buffer:
+- `"aoi-name": {"bbox": "min_lon,min_lat,max_lon,max_lat"},`
+- `"aoi-name": {"point": "lon,lat", "buffer_km": 10},`: the bbox is computed as a square `buffer_km` around the point (in the point's UTM zone). If an entry has both, the point and buffer take precedence.
+
+You can append the file directly following that format, or you can run the following code to generate one from bounds or a point plus a km buffer:
 ```bash
 uv run python utils/generate_aoi_details.py
 ```
@@ -127,8 +131,19 @@ Flags:
     - GSLC/GUNW: `HH`, `HV`
 - `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
 - `--db`: applies to GSLC/GCOV only.
-- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
-- `--keep-h5`: by default each `.h5` is deleted after converting
+- `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene).
+- `--keep-h5`: by default each downloaded `.h5` is deleted after converting
+
+How the data is fetched: each `.h5` is several GB, but `nisar_access` only needs one band from it. When that band is small, it is read directly from ASF over HTTP instead of downloading the whole file:
+
+For GCOV, the switch is the number of pixels read: output pixels (crop or full scene, at 10 m for frequency A or 80 m for B) × number of polarizations. Up to 60 Mpx the bands are read remotely; above that the whole `.h5` is downloaded.
+
+| GCOV, one polarization | `--crop` (20 km AOI) | uncropped |
+|---|---|---|
+| Frequency A | ~4 Mpx: read remotely (~15 s/scene) | ~1,100 Mpx: download whole `.h5` (~80-100 s/scene) |
+| Frequency B | ~0.06 Mpx: read remotely (~6 s/scene) | ~18 Mpx: read remotely (~12 s/scene) |
+
+Remote reads are many small sequential requests, so their time grows with the pixels read: about 10 s + 0.9 s per million pixels (a 50 km AOI at frequency A is ~25 Mpx, ~40 s), versus ~80-100 s to download a whole `.h5` whatever is used from it. The crossover is near 80 Mpx; the 60 Mpx limit is `NISAR_REMOTE_MAX_PIXELS` in `utils/variables.py`. Times are from test scenes at ~65 MB/s. Other products read crops remotely and download full scenes. If a scene's `.h5` is already in `data/nisar_h5_scenes/` (e.g. from `--keep-h5`), it is used instead.
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
 ### Step-by-step runs
@@ -154,7 +169,7 @@ Flags:
     - `--polarization`
     - `--frequency A|B`
     - `--db`
-    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop
+    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
     - `--remove-h5`
     - `--out-dir`
     - `--inspect`: print the H5 structure instead of converting
@@ -184,6 +199,8 @@ Flags:
 - `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
 - `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
+
+How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead.
 
 ### Step-by-step runs
 

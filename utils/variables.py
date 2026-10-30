@@ -39,6 +39,17 @@ ALOS2_GEOTIFF_PATH = DATA_DIRECTORY / "alos2_geotiffs"
 TEST_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/NISAR_L2_GCOV_PROVISIONAL_V1/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001.h5"
 TEST_XML_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/NISAR_L2_GCOV_PROVISIONAL_V1/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001/NISAR_L2_PR_GCOV_029_026_D_069_4005_DHDH_A_20260827T001756_20260827T001830_P05023_N_F_J_001.h5.iso.xml"
 
+# REMOTE READS vs WHOLE-FILE DOWNLOADS
+# GCOV grid pixel size per frequency (from the product files)
+NISAR_GCOV_PIXEL_SIZE_M = {"A": 10, "B": 80}
+# Nominal GCOV frame width/height, for sizing uncropped reads (ASF search results have no NISAR footprint);
+# measured frames were 4122 x 4221 and 4113 x 4203 pixels at 80 m
+NISAR_GCOV_SCENE_SIZE_M = 335_000
+# Most pixels (output pixels x polarizations) that nisar_access reads remotely; more downloads the whole .h5.
+# Timed on GCOV frequency A at ~65 MB/s: remote ~10 s + 0.9 s per Mpx vs ~80-95 s for the whole file,
+# so they break even near 80 Mpx. 60 Mpx (~77 km box at 10 m, one polarization) leaves margin for faster downloads.
+NISAR_REMOTE_MAX_PIXELS = 60_000_000
+
 # NISAR PROCESSING DATA (where each product's data lives inside the .h5, how to name the output, and its nodata value)
 NISAR_PROCESSING_INFO = {
     "GSLC": {
@@ -90,6 +101,22 @@ try:
 except ImportError:
     pass
 
+# AOIs given as "point" (lon,lat) + "buffer_km" get their bbox from the point; it takes precedence over any "bbox"
+if any("point" in aoi for aoi in SEARCH_AOIS.values()):
+    # geopandas is slow to import, so only load it when an AOI needs it
+    from utils.generate_aoi_details import point_to_bbox
+
+    for name, aoi in SEARCH_AOIS.items():
+        if "point" in aoi:
+            if "buffer_km" not in aoi:
+                raise ValueError(f'AOI "{name}" has a "point" but no "buffer_km"')
+            lon, lat = (float(v) for v in aoi["point"].split(","))
+            aoi["bbox"] = point_to_bbox(lon, lat, aoi["buffer_km"])
+
+for name, aoi in SEARCH_AOIS.items():
+    if "bbox" not in aoi:
+        raise ValueError(f'AOI "{name}" needs a "bbox", or a "point" and "buffer_km"')
+
 
 # JAXA VARIABLES
 # PALSAR-2 ScanSAR L2.2 on JAXA's public S3 bucket (no credentials needed)
@@ -105,3 +132,10 @@ ALOS2_MODES = ["WBD", "WWD", "WBS", "WWS", "VBD"]
 ALOS2_HH_ONLY_MODES = {"WBS", "WWS"}
 ALOS2_MASK_DROP = (2, 3, 5)  # MSK values: 2 layover, 3 shadow, 5 invalid
 ALOS2_ATTRIBUTION = "©JAXA"
+# L2.2 GeoTIFF pixel size
+ALOS2_PIXEL_SIZE_M = 25
+# Largest crop (output pixels per HH/HV file) that alos2_access reads remotely; bigger crops download whole files.
+# Each polarization is its own file, so both routes scale with the number of polarizations and the limit is per file.
+# Timed at ~24 MB/s from JAXA's bucket: remote ~1.3 s + 0.42 s per Mpx vs ~17 s download + 0.18 s per Mpx convert,
+# so they break even near 65 Mpx per file. 50 Mpx (~175 km box at 25 m) leaves margin for faster downloads.
+ALOS2_REMOTE_MAX_PIXELS = 50_000_000

@@ -9,6 +9,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "earthaccess>=0.19.0",
+    "fsspec[http]>=2026.7.0",
     "geopandas>=1.2.0",
     "h5py>=3.16.0",
     "ipyleaflet>=0.20.0",
@@ -16,6 +17,7 @@ dependencies = [
     "pyreqwest>=0.12.4",
     "python-dotenv>=1.2.3",
     "rasterio>=1.5.1",
+    "tqdm>=4.70.0",
 ]
 
 [dependency-groups]

@@ -628,6 +628,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/3c/6a2bf344106328fd04963664a60b9bb6496fc25df8e962fcdc1367285fb9/fsspec-2026.7.0-py3-none-any.whl", hash = "sha256:b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279", size = 206583, upload-time = "2026-07-28T16:34:49.538Z" },
 ]
 
+[package.optional-dependencies]
+http = [
+    { name = "aiohttp" },
+]
+
 [[package]]
 name = "geopandas"
 version = "1.2.0"
@@ -1288,6 +1293,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "earthaccess" },
+    { name = "fsspec", extra = ["http"] },
     { name = "geopandas" },
     { name = "h5py" },
     { name = "ipyleaflet" },
@@ -1295,6 +1301,7 @@ dependencies = [
     { name = "pyreqwest" },
     { name = "python-dotenv" },
     { name = "rasterio" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -1306,6 +1313,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "earthaccess", specifier = ">=0.19.0" },
+    { name = "fsspec", extras = ["http"], specifier = ">=2026.7.0" },
     { name = "geopandas", specifier = ">=1.2.0" },
     { name = "h5py", specifier = ">=3.16.0" },
     { name = "ipyleaflet", specifier = ">=0.20.0" },
@@ -1313,6 +1321,7 @@ requires-dist = [
     { name = "pyreqwest", specifier = ">=0.12.4" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "rasterio", specifier = ">=1.5.1" },
+    { name = "tqdm", specifier = ">=4.70.0" },
 ]
 
 [package.metadata.requires-dev]

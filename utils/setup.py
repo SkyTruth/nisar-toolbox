@@ -25,6 +25,7 @@ from utils.variables import (
 AOIS_TEMPLATE = """\
 # AOIs. These are git-ignored.
 # Format: "aoi-name": {"bbox": "min_lon,min_lat,max_lon,max_lat"},
+#     or: "aoi-name": {"point": "lon,lat", "buffer_km": 10},  (bbox computed from the point)
 
 SEARCH_AOIS = {
 }
