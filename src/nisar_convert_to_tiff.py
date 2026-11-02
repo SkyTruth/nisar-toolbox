@@ -52,6 +52,9 @@ def open_h5(source):
     # e.g. 401 from an expired token; RuntimeError like download_scene, so batch loops record it and move on
     except aiohttp.ClientResponseError as exc:
         raise RuntimeError(f"{exc.status} {exc.message} for {source}") from exc
+    # Dropped connection or truncated body mid-read (the RequestError equivalent for downloads)
+    except aiohttp.ClientError as exc:
+        raise RuntimeError(f"{type(exc).__name__}: {exc} for {source}") from exc
 
 
 def to_output(block, db: bool = False):
