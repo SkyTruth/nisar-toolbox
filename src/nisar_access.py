@@ -72,8 +72,8 @@ def process_scene(
                         out_dir=args.out_dir,
                     )
                 )
-            # Only reached if every polarization converted; a local .h5 used in remote mode is left alone
-            if not remote and not args.keep_h5:
+            # Only reached if every polarization converted; deletes any local .h5 used (not a remote read), as before
+            if h5 != url and not args.keep_h5:
                 h5.unlink()
 
         # Same failure types the standalone batch loops catch, so one bad scene doesn't stop the run
@@ -127,7 +127,7 @@ def main() -> None:
     parser.add_argument(
         "--keep-h5",
         action="store_true",
-        help="Keep each downloaded .h5 after converting (default: delete). Only applies when the whole .h5 is downloaded (GCOV reads above NISAR_REMOTE_MAX_PIXELS, e.g. uncropped frequency A, or uncropped non-GCOV products).",
+        help="Keep each local .h5 after converting (default: delete). Bands read remotely are never downloaded, so there is no .h5 to keep.",
     )
     parser.add_argument(
         "--out-dir",

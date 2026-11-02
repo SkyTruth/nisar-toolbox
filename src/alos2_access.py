@@ -49,6 +49,7 @@ def process_scene(
                 if remote and local_tif.exists():
                     # Already on disk (e.g. from --keep-tif); reading locally beats going remote
                     src_tif = local_tif
+                    downloaded.append(src_tif)
                 elif remote:
                     src_tif = url
                 else:
@@ -123,7 +124,7 @@ def main() -> None:
     parser.add_argument(
         "--keep-tif",
         action="store_true",
-        help="Keep each downloaded source .tif after converting (default: delete). HH/HV read remotely with --crop are not downloaded.",
+        help="Keep each local source .tif after converting (default: delete). HH/HV read remotely with --crop are never downloaded, so there is no .tif to keep.",
     )
     parser.add_argument(
         "--out-dir",

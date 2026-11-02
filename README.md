@@ -143,7 +143,7 @@ For GCOV, the switch is the number of pixels read: output pixels (crop or full s
 | Frequency A | ~4 Mpx: read remotely (~15 s/scene) | ~1,100 Mpx: download whole `.h5` (~80-100 s/scene) |
 | Frequency B | ~0.06 Mpx: read remotely (~6 s/scene) | ~18 Mpx: read remotely (~12 s/scene) |
 
-Remote reads are many small sequential requests, so their time grows with the pixels read: about 10 s + 0.9 s per million pixels (a 50 km AOI at frequency A is ~25 Mpx, ~40 s), versus ~80-100 s to download a whole `.h5` whatever is used from it. The crossover is near 80 Mpx; the 60 Mpx limit is `NISAR_REMOTE_MAX_PIXELS` in `utils/variables.py`. Times are from test scenes at ~65 MB/s. Other products read crops remotely and download full scenes. If a scene's `.h5` is already in `data/nisar_h5_scenes/` (e.g. from `--keep-h5`), it is used instead.
+Remote reads are many small sequential requests, so their time grows with the pixels read: about 10 s + 0.9 s per million pixels (a 50 km AOI at frequency A is ~25 Mpx, ~40 s), versus ~80-100 s to download a whole `.h5` whatever is used from it. The crossover is near 80 Mpx; the 60 Mpx limit is `NISAR_REMOTE_MAX_PIXELS` in `utils/variables.py`. Times are from test scenes at ~65 MB/s. Other products read crops remotely and download full scenes. If a scene's `.h5` is already in `data/nisar_h5_scenes/` (e.g. from `--keep-h5`), it is used instead, and deleted afterwards unless `--keep-h5` is given.
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
 ### Step-by-step runs
@@ -200,7 +200,7 @@ Flags:
 - `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
 
-How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead.
+How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead, and deleted afterwards unless `--keep-tif` is given.
 
 ### Step-by-step runs
 
