@@ -6,12 +6,14 @@ from urllib.parse import urlparse
 
 import numpy as np
 import rasterio
+from rasterio.crs import CRS
 from rasterio.enums import Resampling
 from rasterio.warp import transform_bounds
 from rasterio.windows import Window, from_bounds
 from rasterio.windows import transform as window_transform
 
-from src.nisar_convert_to_tiff import is_url, to_output
+from src.nisar_convert_to_tiff import is_url, reproject_tif, to_output
+from utils.geometry import epsg_crs
 from utils.variables import (
     ALOS2_ATTRIBUTION,
     ALOS2_CAL_DB,
@@ -65,11 +67,13 @@ def convert_scene_to_geotiff(
     aoi_name: str = "crop",
     out_dir: Path | str = ALOS2_GEOTIFF_PATH,
     overwrite: bool = False,
+    dst_crs: str | None = None,
 ) -> Path:
     """
     Convert a single, specified PALSAR-2 L2.2 HH/HV GeoTIFF (DN) to a calibrated gamma0 GeoTIFF.
     tif_path can also be a JAXA download URL, read remotely without downloading the whole file
     (worthwhile with a bbox, since only the cropped tiles are fetched). The mask is always a local file.
+    dst_crs (e.g. "EPSG:4326") reprojects the output; by default it stays on the scene's UTM grid.
     """
 
     remote = is_url(tif_path)
@@ -96,6 +100,9 @@ def convert_scene_to_geotiff(
         suffix += "_dB"
     if mask:
         suffix += "_masked"
+    # CRS before the AOI name: the viewer notebook finds crops by the name ending in _<aoi>
+    if dst_crs:
+        suffix += f"_epsg{CRS.from_user_input(dst_crs).to_epsg()}"
     if bbox:
         suffix += f"_{aoi_name}"
 
@@ -109,6 +116,8 @@ def convert_scene_to_geotiff(
 
     # Write to a partial file so a failed conversion never looks complete
     part = out_path.with_suffix(".tif.part")
+    # Scene-grid copy, used only when reprojecting: written first, then warped into `part`
+    native = out_path.with_suffix(".native.tif.part")
     try:
         with (
             rasterio.Env(**REMOTE_GDAL_ENV) if remote else nullcontext(),
@@ -133,8 +142,11 @@ def convert_scene_to_geotiff(
             h, w = int(win.height), int(win.width)
             r_off, c_off = int(win.row_off), int(win.col_off)
 
+            # Reproject only when asked for a CRS other than the scene's own
+            warp = dst_crs is not None and CRS.from_user_input(dst_crs) != src.crs
+
             with rasterio.open(
-                part,
+                native if warp else part,
                 "w",
                 driver="GTiff",
                 height=h,
@@ -159,7 +171,10 @@ def convert_scene_to_geotiff(
                         block[
                             np.isin(msk.read(1, window=read_win), ALOS2_MASK_DROP)
                         ] = np.nan
-                    dst.write(to_output(block, db), 1, window=Window(0, r, w, n))
+                    # When reprojecting, keep values linear here; reproject_tif converts to dB after resampling
+                    dst.write(
+                        to_output(block, db and not warp), 1, window=Window(0, r, w, n)
+                    )
 
                 dst.update_tags(
                     ATTRIBUTION=ALOS2_ATTRIBUTION,
@@ -168,6 +183,11 @@ def convert_scene_to_geotiff(
                     UNITS="gamma0 (dB)" if db else "gamma0 (linear power)",
                     CALIBRATION="gamma0 = DN^2 * 10^(-8.3)",
                 )
+
+            # reproject_tif copies these tags over; UNITS follows db, so it's right after reprojecting too
+            if warp:
+                reproject_tif(native, part, dst_crs, db)
+                native.unlink()
 
             # Overviews so full scenes render quickly when zoomed out (skipped for small crops)
             with (
@@ -181,6 +201,7 @@ def convert_scene_to_geotiff(
 
     except Exception:
         part.unlink(missing_ok=True)
+        native.unlink(missing_ok=True)
         raise
 
     part.replace(out_path)
@@ -200,6 +221,7 @@ def convert_scenes_to_geotiff(
     aoi_name: str = "crop",
     out_dir: Path | str = ALOS2_GEOTIFF_PATH,
     overwrite: bool = False,
+    dst_crs: str | None = None,
 ) -> list[Path]:
     """
     Convert a list of PALSAR-2 L2.2 tifs to calibrated GeoTIFFs.
@@ -220,6 +242,7 @@ def convert_scenes_to_geotiff(
                     aoi_name,
                     out_dir,
                     overwrite,
+                    dst_crs,
                 )
             )
 
@@ -283,6 +306,11 @@ def main():
         help="Reconvert even if the GeoTIFF already exists (e.g. after changing --bbox).",
     )
     parser.add_argument(
+        "--crs",
+        type=epsg_crs,
+        help="Output CRS as an EPSG code, e.g. EPSG:4326 or EPSG:3857 (default: the scene's own UTM zone).",
+    )
+    parser.add_argument(
         "--out-dir",
         "--outdir",
         "--outpath",
@@ -316,6 +344,7 @@ def main():
             args.aoi_name,
             args.out_dir,
             args.overwrite,
+            args.crs,
         )
 
 

@@ -11,7 +11,7 @@ from tqdm import tqdm
 from src.asf_sar_search import construct_api_search
 from src.nisar_convert_to_tiff import convert_scene_to_geotiff
 from src.nisar_dl import download_scene
-from utils.geometry import crop_pixels
+from utils.geometry import crop_pixels, epsg_crs
 from utils.variables import (
     ASF_DEFAULT_PROCESSING_LEVEL,
     EARTHDATA_TOKEN,
@@ -62,6 +62,7 @@ def process_scene(
                         aoi_name=args.aoi,
                         out_dir=args.out_dir,
                         overwrite=args.overwrite,
+                        dst_crs=args.crs,
                     )
                 )
             # Only reached if every polarization converted; deletes any local .h5 used (not a remote read), as before
@@ -141,6 +142,11 @@ def main() -> None:
         "--overwrite",
         action="store_true",
         help="Reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or buffer_km).",
+    )
+    parser.add_argument(
+        "--crs",
+        type=epsg_crs,
+        help="Output CRS as an EPSG code, e.g. EPSG:4326 or EPSG:3857 (default: the scene's own, usually UTM).",
     )
     parser.add_argument(
         "--workers",
