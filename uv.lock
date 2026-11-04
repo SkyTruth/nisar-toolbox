@@ -1288,51 +1288,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nisar-toolbox"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "earthaccess" },
-    { name = "fsspec", extra = ["http"] },
-    { name = "geopandas" },
-    { name = "h5py" },
-    { name = "ipyleaflet" },
-    { name = "polars" },
-    { name = "pyreqwest" },
-    { name = "python-dotenv" },
-    { name = "rasterio" },
-    { name = "tqdm" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "jupyterlab" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", specifier = ">=3.14.3" },
-    { name = "earthaccess", specifier = ">=0.19.0" },
-    { name = "fsspec", extras = ["http"], specifier = ">=2026.7.0" },
-    { name = "geopandas", specifier = ">=1.2.0" },
-    { name = "h5py", specifier = ">=3.16.0" },
-    { name = "ipyleaflet", specifier = ">=0.20.0" },
-    { name = "polars", specifier = ">=1.44.1" },
-    { name = "pyreqwest", specifier = ">=0.12.4" },
-    { name = "python-dotenv", specifier = ">=1.2.3" },
-    { name = "rasterio", specifier = ">=1.5.1" },
-    { name = "tqdm", specifier = ">=4.70.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "jupyterlab", specifier = ">=4.6.4" },
-    { name = "ruff", specifier = ">=0.16.5" },
-]
-
-[[package]]
 name = "notebook-shim"
 version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2084,6 +2039,51 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/12/60/69fc080b72a32971b2fb5acbc80802b0e876b606f6e27b1689caac4bb57b/s3fs-2026.7.0.tar.gz", hash = "sha256:76b062d1b2bc7bf4bcd9e7d8f1eb2b5dd9d5cee96ce888664c4ddb5f563146bf", size = 87595, upload-time = "2026-07-28T17:14:10.595Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/cc/bcde19a37952ecc58e7d9d67ecaa048e1e21b17d014ce0863a6a6101e606/s3fs-2026.7.0-py3-none-any.whl", hash = "sha256:64edf3c01ebffab1eec38ff9c09eefbf86a3db14c87d248f795da0e7b801d698", size = 32659, upload-time = "2026-07-28T17:14:09.497Z" },
+]
+
+[[package]]
+name = "sar-toolbox"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "earthaccess" },
+    { name = "fsspec", extra = ["http"] },
+    { name = "geopandas" },
+    { name = "h5py" },
+    { name = "ipyleaflet" },
+    { name = "polars" },
+    { name = "pyreqwest" },
+    { name = "python-dotenv" },
+    { name = "rasterio" },
+    { name = "tqdm" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "jupyterlab" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.14.3" },
+    { name = "earthaccess", specifier = ">=0.19.0" },
+    { name = "fsspec", extras = ["http"], specifier = ">=2026.7.0" },
+    { name = "geopandas", specifier = ">=1.2.0" },
+    { name = "h5py", specifier = ">=3.16.0" },
+    { name = "ipyleaflet", specifier = ">=0.20.0" },
+    { name = "polars", specifier = ">=1.44.1" },
+    { name = "pyreqwest", specifier = ">=0.12.4" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
+    { name = "rasterio", specifier = ">=1.5.1" },
+    { name = "tqdm", specifier = ">=4.70.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "jupyterlab", specifier = ">=4.6.4" },
+    { name = "ruff", specifier = ">=0.16.5" },
 ]
 
 [[package]]
