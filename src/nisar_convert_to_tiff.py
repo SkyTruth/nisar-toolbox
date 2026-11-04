@@ -29,6 +29,19 @@ def is_url(source) -> bool:
     return str(source).startswith(("http://", "https://"))
 
 
+def resolve_h5(source):
+    """A URL as given; otherwise a local .h5 path, or a file/granule name looked up in NISAR_H5_PATH."""
+    if is_url(source):
+        return source
+    path = Path(source)
+    if not path.exists():
+        name = path.name if path.name.endswith(".h5") else f"{path.name}.h5"
+        path = NISAR_H5_PATH / name
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found; download it first")
+    return path
+
+
 @contextmanager
 def open_h5(source):
     """Open a local .h5, or a remote one over HTTP (only the byte ranges actually read are fetched)."""
@@ -93,15 +106,7 @@ def convert_scene_to_geotiff(
     """
 
     remote = is_url(h5_path)
-    if not remote:
-        # Use path as given, look in NISAR_H5_PATH otherwise
-        h5_path = Path(h5_path)
-        if not h5_path.exists():
-            h5_path = NISAR_H5_PATH / h5_path.name
-
-        # Check the h5 file exists
-        if not h5_path.exists():
-            raise FileNotFoundError(f"{h5_path} not found; download it first")
+    h5_path = resolve_h5(h5_path)
 
     # Granule name from the file name, local or in the URL
     granule_name = PurePosixPath(urlparse(str(h5_path)).path).stem
@@ -338,7 +343,7 @@ def main():
 
     if args.inspect:
         for h5_file in args.h5:
-            with h5py.File(NISAR_H5_PATH / f"{Path(h5_file).stem}.h5", "r") as src:
+            with open_h5(resolve_h5(h5_file)) as src:
                 src.visititems(show)
     else:
         convert_scenes_to_geotiff(

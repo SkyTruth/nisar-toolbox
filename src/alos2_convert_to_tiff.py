@@ -43,6 +43,19 @@ def dn_to_gamma0(block):
     return gamma0
 
 
+def resolve_tif(source):
+    """A URL as given; otherwise a local .tif path, or a file name looked up in ALOS2_TIF_PATH."""
+    if is_url(source):
+        return source
+    path = Path(source)
+    if not path.exists():
+        name = path.name if path.name.endswith(".tif") else f"{path.name}.tif"
+        path = ALOS2_TIF_PATH / name
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found; download it first")
+    return path
+
+
 def convert_scene_to_geotiff(
     tif_path: Path | str,
     remove_tif: bool = False,
@@ -60,15 +73,7 @@ def convert_scene_to_geotiff(
     """
 
     remote = is_url(tif_path)
-    if not remote:
-        # Use path as given, look in ALOS2_TIF_PATH otherwise
-        tif_path = Path(tif_path)
-        if not tif_path.exists():
-            tif_path = ALOS2_TIF_PATH / tif_path.name
-
-        # Check the tif file exists
-        if not tif_path.exists():
-            raise FileNotFoundError(f"{tif_path} not found; download it first")
+    tif_path = resolve_tif(tif_path)
 
     # Determine scene and polarization from the file name, local or in the URL
     stem = PurePosixPath(urlparse(str(tif_path)).path).stem
@@ -293,7 +298,12 @@ def main():
 
     if args.inspect:
         for tif_file in args.tif:
-            with rasterio.open(ALOS2_TIF_PATH / f"{Path(tif_file).stem}.tif") as src:
+            source = resolve_tif(tif_file)
+            remote = is_url(source)
+            with (
+                rasterio.Env(**REMOTE_GDAL_ENV) if remote else nullcontext(),
+                rasterio.open(f"/vsicurl/{source}" if remote else source) as src,
+            ):
                 print(src.profile)
                 print(src.tags())
     else:
