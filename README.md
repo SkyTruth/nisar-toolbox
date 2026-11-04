@@ -167,11 +167,12 @@ Remote reads are many small sequential requests, so their time grows with the pi
     ```
     Flags:
     - `--polarization`
-    - `--frequency A|B`
+    - `--frequency A|B`: defaults to B
     - `--db`
-    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
+    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop, required with bbox. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
     - `--remove-h5`
     - `--out-dir`
+    - `--overwrite`
     - `--inspect`: print the H5 structure instead of converting
 
 # PALSAR-2 Data Access
