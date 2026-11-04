@@ -228,6 +228,7 @@ def convert_scenes_to_geotiff(
     bbox: list[float] | None = None,
     aoi_name: str = "crop",
     out_dir: Path | str = NISAR_GEOTIFF_PATH,
+    overwrite: bool = False,
 ) -> list[Path]:
     """
     Convert a list of h5 scenes to GeoTIFF.
@@ -248,6 +249,7 @@ def convert_scenes_to_geotiff(
                     bbox,
                     aoi_name,
                     out_dir,
+                    overwrite,
                 )
             )
 
@@ -312,8 +314,12 @@ def main():
     )
     parser.add_argument(
         "--aoi-name",
-        default="crop",
-        help="Appended to the output name when --bbox is used.",
+        help="Appended to the output name; required with --bbox so different crops don't share a file name.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Reconvert even if the GeoTIFF already exists (e.g. after changing --bbox).",
     )
     parser.add_argument(
         "--out-dir",
@@ -325,6 +331,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.bbox and not args.aoi_name:
+        parser.error("--aoi-name is required with --bbox")
 
     if args.inspect:
         for h5_file in args.h5:
