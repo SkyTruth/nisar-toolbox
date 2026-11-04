@@ -207,13 +207,13 @@ def convert_scenes_to_geotiff(
         try:
             tifs.append(
                 convert_scene_to_geotiff(
-                    tif_path, 
-                    remove_tif, 
-                    db, 
-                    mask, 
-                    bbox, 
-                    aoi_name, 
-                    out_dir, 
+                    tif_path,
+                    remove_tif,
+                    db,
+                    mask,
+                    bbox,
+                    aoi_name,
+                    out_dir,
                     overwrite,
                 )
             )
