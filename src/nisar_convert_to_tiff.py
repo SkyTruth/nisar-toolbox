@@ -257,7 +257,8 @@ def convert_scenes_to_geotiff(
         # KeyError: dataset path not in this h5 (e.g. wrong polarization/frequency)
         # ValueError: unsupported processing level
         # IndexError: file name doesn't follow the NISAR granule naming convention
-        except (OSError, KeyError, ValueError, IndexError) as exc:
+        # RuntimeError: remote read failed (e.g. 401 from an expired token, or no token), raised in open_h5
+        except (OSError, KeyError, ValueError, IndexError, RuntimeError) as exc:
             print(f"  FAILED: {exc}")
             failures.append((name, str(exc)))
 
