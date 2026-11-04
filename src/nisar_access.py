@@ -112,6 +112,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--polarization",
+        "--pol",
+        type=str.upper,
         nargs="+",
         help="One GeoTIFF per polarization, e.g. HH, HV, VV, HHHH, HVHV, VVVV. Defaults per product.",
     )

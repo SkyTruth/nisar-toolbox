@@ -295,6 +295,8 @@ def main():
     )
     parser.add_argument(
         "--polarization",
+        "--pol",
+        type=str.upper,
         help="GCOV: HHHH or HVHV. GUNW: HH or HV. Ignored for SME2. Defaults per product.",
     )
     parser.add_argument(

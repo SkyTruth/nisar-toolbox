@@ -103,6 +103,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--polarization",
+        "--pol",
         nargs="+",
         default=["HH", "HV"],
         type=str.upper,
