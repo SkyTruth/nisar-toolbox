@@ -280,13 +280,13 @@ def main():
         help="One or more .h5 files or granule names (looked up in data/nisar_h5_scenes/), or ASF download URLs (read remotely; use with --bbox).",
     )
     parser.add_argument(
-            "--frequency",
-            "--freq",
-            type=str.upper,
-            choices=["A", "B"],
-            default="B",
-            help="A: higher resolution, larger files. B: lower resolution, smaller (default: %(default)s).",
-        )
+        "--frequency",
+        "--freq",
+        type=str.upper,
+        choices=["A", "B"],
+        default="B",
+        help="A: higher resolution, larger files. B: lower resolution, smaller (default: %(default)s).",
+    )
     parser.add_argument(
         "--polarization",
         help="GCOV: HHHH or HVHV. GUNW: HH or HV. Ignored for SME2. Defaults per product.",
