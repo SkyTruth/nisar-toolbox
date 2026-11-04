@@ -102,7 +102,14 @@ def main() -> None:
     parser.add_argument(
         "--ed", "--end", dest="end", required=True, help="End Date: YYYY-MM-DD"
     )
-    parser.add_argument("--frequency", choices=["A", "B"], default="B")
+    parser.add_argument(
+        "--frequency",
+        "--freq",
+        type=str.upper,
+        choices=["A", "B"],
+        default="B",
+        help="A: higher resolution, larger files. B: lower resolution, smaller (default: %(default)s).",
+    )
     parser.add_argument(
         "--polarization",
         nargs="+",
