@@ -349,6 +349,7 @@ def main():
             args.bbox,
             args.aoi_name,
             args.out_dir,
+            args.overwrite,
         )
 
 
