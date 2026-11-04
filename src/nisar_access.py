@@ -6,12 +6,12 @@ from pathlib import Path
 
 from pyreqwest.client import SyncClientBuilder
 from pyreqwest.exceptions import RequestError
-from rasterio.warp import transform_bounds
 from tqdm import tqdm
 
 from src.asf_sar_search import construct_api_search
 from src.nisar_convert_to_tiff import convert_scene_to_geotiff
 from src.nisar_dl import download_scene
+from utils.geometry import crop_pixels
 from utils.variables import (
     ASF_DEFAULT_PROCESSING_LEVEL,
     EARTHDATA_TOKEN,
@@ -23,15 +23,6 @@ from utils.variables import (
     NISAR_REMOTE_MAX_PIXELS,
     SEARCH_AOIS,
 )
-
-
-def crop_pixels(bbox: list[float], pixel_size_m: float) -> int:
-    """Approximate output pixels for a lon/lat bbox, measured in the UTM zone of its center (as NISAR grids are)."""
-    lon = (bbox[0] + bbox[2]) / 2
-    lat = (bbox[1] + bbox[3]) / 2
-    epsg = (32600 if lat >= 0 else 32700) + int((lon + 180) // 6) + 1
-    west, south, east, north = transform_bounds("EPSG:4326", f"EPSG:{epsg}", *bbox)
-    return round((east - west) / pixel_size_m) * round((north - south) / pixel_size_m)
 
 
 def process_scene(
@@ -70,6 +61,7 @@ def process_scene(
                         bbox=crop_bbox,
                         aoi_name=args.aoi,
                         out_dir=args.out_dir,
+                        overwrite=args.overwrite,
                     )
                 )
             # Only reached if every polarization converted; deletes any local .h5 used (not a remote read), as before
@@ -135,6 +127,11 @@ def main() -> None:
         dest="out_dir",
         default=NISAR_GEOTIFF_PATH,
         help=f"Folder to write GeoTIFFs to; created if missing. Defaults to {NISAR_GEOTIFF_PATH}.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or buffer_km).",
     )
     parser.add_argument(
         "--workers",

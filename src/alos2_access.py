@@ -11,7 +11,7 @@ from tqdm import tqdm
 from src.alos2_convert_to_tiff import convert_scene_to_geotiff
 from src.alos2_dl import URL_COLUMNS, download_scene, file_name
 from src.alos2_search import construct_s3_search
-from src.nisar_access import crop_pixels
+from utils.geometry import crop_pixels
 from utils.variables import (
     ALOS2_GEOTIFF_PATH,
     ALOS2_MODES,
@@ -65,6 +65,7 @@ def process_scene(
                         bbox=crop_bbox,
                         aoi_name=args.aoi,
                         out_dir=args.out_dir,
+                        overwrite=args.overwrite,
                     )
                 )
             # Only reached if every polarization converted
@@ -132,6 +133,11 @@ def main() -> None:
         dest="out_dir",
         default=ALOS2_GEOTIFF_PATH,
         help=f"Folder to write GeoTIFFs to; created if missing. Defaults to {ALOS2_GEOTIFF_PATH}.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or buffer_km).",
     )
     parser.add_argument(
         "--workers",

@@ -51,6 +51,7 @@ def convert_scene_to_geotiff(
     bbox: list[float] | None = None,
     aoi_name: str = "crop",
     out_dir: Path | str = ALOS2_GEOTIFF_PATH,
+    overwrite: bool = False,
 ) -> Path:
     """
     Convert a single, specified PALSAR-2 L2.2 HH/HV GeoTIFF (DN) to a calibrated gamma0 GeoTIFF.
@@ -97,7 +98,7 @@ def convert_scene_to_geotiff(
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{stem}_{suffix}.tif"
 
-    if out_path.exists():
+    if out_path.exists() and not overwrite:
         print(f"    Skipping {out_path.name} (already exists)")
         return out_path
 
