@@ -138,7 +138,7 @@ Flags:
 - `--keep-h5`: by default each downloaded `.h5` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 - `--overwrite`: reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or `buffer_km`)
-- `--workers N`: scenes processed in parallel (default 4). Speeds up remote reads near-linearly; whole-file downloads share bandwidth, so they gain little, and each needs ~6 GB of disk at once.
+- `--workers N`: scenes processed in parallel (default 4, and recommend limiting to 4 or less). Speeds up remote reads near-linearly; whole-file downloads share bandwidth, so they gain little, and each needs ~6 GB of disk at once.
 
 How the data is fetched: each `.h5` is several GB, but `nisar_access` only needs one band from it. When that band is small, it is read directly from ASF over HTTP instead of downloading the whole file:
 
@@ -211,7 +211,7 @@ Flags:
 - `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
 - `--overwrite`: reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or `buffer_km`)
-- `--workers N`: scenes processed in parallel (default 4). Speeds up remote reads; whole-file downloads share bandwidth.
+- `--workers N`: scenes processed in parallel (default 4, and recommend limiting to 4 or less). Speeds up remote reads; whole-file downloads share bandwidth.
 
 How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead, and deleted afterwards unless `--keep-tif` is given.
 
