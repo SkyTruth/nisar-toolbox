@@ -87,7 +87,7 @@ SEARCH_AOIS = {
     "wva-test-area": {"bbox": "-82.233966,37.994819,-81.8204,38.254771"},
     "drc-test-area": {"bbox": "11.173938,-6.499376,11.718339,-5.954592"},
     "indian-ocean-test-area": {"bbox": "87.547812,5.546815,88.452932,6.45293"},
-    "leaky-infrastructure-70111": {"point": "5.312,4.803","buffer_km": 20},
+    "leaky-infrastructure-70111": {"point": "5.312,4.803", "buffer_km": 20},
 }
 
 # Import AOIs from git-ignored file (utils/aois.py); same names override the test ones

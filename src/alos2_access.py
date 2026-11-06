@@ -11,7 +11,7 @@ from tqdm import tqdm
 from src.alos2_convert_to_tiff import convert_scene_to_geotiff
 from src.alos2_dl import URL_COLUMNS, download_scene, file_name
 from src.alos2_search import construct_s3_search
-from utils.geometry import crop_pixels
+from utils.geometry import crop_pixels, epsg_crs
 from utils.variables import (
     ALOS2_GEOTIFF_PATH,
     ALOS2_MODES,
@@ -66,6 +66,7 @@ def process_scene(
                         aoi_name=args.aoi,
                         out_dir=args.out_dir,
                         overwrite=args.overwrite,
+                        dst_crs=args.crs,
                     )
                 )
             # Only reached if every polarization converted
@@ -103,6 +104,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--polarization",
+        "--pol",
         nargs="+",
         default=["HH", "HV"],
         type=str.upper,
@@ -138,6 +140,11 @@ def main() -> None:
         "--overwrite",
         action="store_true",
         help="Reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or buffer_km).",
+    )
+    parser.add_argument(
+        "--crs",
+        type=epsg_crs,
+        help="Output CRS as an EPSG code, e.g. EPSG:4326 or EPSG:3857 (default: the scene's own UTM zone).",
     )
     parser.add_argument(
         "--workers",

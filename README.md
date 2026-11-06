@@ -127,12 +127,18 @@ uv run python -m src.nisar_access --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
 Flags:
 - `--product`
 - `--polarization POL [POL ...]`: one GeoTIFF per polarization; defaults per product, polarization options may not be consistent by collection
+    - Can also be declared as `--pol`
     - GCOV: `HHHH`, `HVHV`, `VVVV`
     - GSLC/GUNW: `HH`, `HV`
 - `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
+    - Can also be declared as `--freq`
 - `--db`: applies to GSLC/GCOV only.
 - `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene).
+- `--crs EPSG:CODE`: reprojects the output GeoTIFF, e.g. `EPSG:4326` or `EPSG:3857` (defaults to the scene's own CRS, usually UTM). The code is added to the file name, e.g. `_epsg4326`.
 - `--keep-h5`: by default each downloaded `.h5` is deleted after converting
+- `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
+- `--overwrite`: reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or `buffer_km`)
+- `--workers N`: scenes processed in parallel (default 4, and recommend limiting to 4 or less). Speeds up remote reads near-linearly; whole-file downloads share bandwidth, so they gain little, and each needs ~6 GB of disk at once.
 
 How the data is fetched: each `.h5` is several GB, but `nisar_access` only needs one band from it. When that band is small, it is read directly from ASF over HTTP instead of downloading the whole file:
 
@@ -144,7 +150,6 @@ For GCOV, the switch is the number of pixels read: output pixels (crop or full s
 | Frequency B | ~0.06 Mpx: read remotely (~6 s/scene) | ~18 Mpx: read remotely (~12 s/scene) |
 
 Remote reads are many small sequential requests, so their time grows with the pixels read: about 10 s + 0.9 s per million pixels (a 50 km AOI at frequency A is ~25 Mpx, ~40 s), versus ~80-100 s to download a whole `.h5` whatever is used from it. The crossover is near 80 Mpx; the 60 Mpx limit is `NISAR_REMOTE_MAX_PIXELS` in `utils/variables.py`. Times are from test scenes at ~65 MB/s. Other products read crops remotely and download full scenes. If a scene's `.h5` is already in `data/nisar_h5_scenes/` (e.g. from `--keep-h5`), it is used instead, and deleted afterwards unless `--keep-h5` is given.
-- `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/nisar_geotiffs/`
 
 ### Step-by-step runs
 
@@ -167,11 +172,15 @@ Remote reads are many small sequential requests, so their time grows with the pi
     ```
     Flags:
     - `--polarization`
-    - `--frequency A|B`
+        - Can also be declared as `--pol`
+    - `--frequency A|B`: defaults to B
+        - Can also be declared as `--freq`
     - `--db`
-    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
+    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop, required with bbox. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
     - `--remove-h5`
     - `--out-dir`
+    - `--overwrite`
+    - `--crs EPSG:CODE`: reproject the output (defaults to the scene's own CRS)
     - `--inspect`: print the H5 structure instead of converting
 
 # PALSAR-2 Data Access
@@ -194,11 +203,15 @@ uv run python -m src.alos2_access --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
 Flags:
 - `--mode MODE [MODE ...]`: only these beam modes (defaults to all)
 - `--polarization POL [POL ...]`: `HH` and/or `HV`, one GeoTIFF per polarization (defaults to both)
+    - Can also be declared as `--pol`
 - `--db`: write gamma0 in dB
 - `--mask`: set layover, shadow and invalid pixels to NaN (also downloads each scene's `_MSK.tif`)
 - `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
+- `--crs EPSG:CODE`: reprojects the output GeoTIFF, e.g. `EPSG:4326` or `EPSG:3857` (defaults to the scene's own UTM zone). The code is added to the file name, e.g. `_epsg4326`.
 - `--keep-tif`: by default each downloaded source `.tif` is deleted after converting
 - `--out-dir`: a user defined path to an output directory, if not defined geotiffs will be written to `data/alos2_geotiffs/`
+- `--overwrite`: reconvert even if the GeoTIFF already exists (e.g. after changing an AOI's bbox or `buffer_km`)
+- `--workers N`: scenes processed in parallel (default 4, and recommend limiting to 4 or less). Speeds up remote reads; whole-file downloads share bandwidth.
 
 How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB per polarization), so with `--crop` only the tiles covering the AOI are read over HTTP instead of downloading whole files, as long as the crop is ≤ 50 Mpx per file (~175 km box at 25 m; `ALOS2_REMOTE_MAX_PIXELS` in `utils/variables.py`). A 20 km AOI takes ~1.5 s per scene for HH + HV + mask, versus ~35 s to download the whole files (JAXA's bucket downloaded at ~24 MB/s in testing). The mask (~1 MB) is always downloaded whole. Uncropped scenes, and crops above the limit, download whole files. If a source `.tif` is already in `data/alos2_tif_scenes/` (e.g. from `--keep-tif`), it is used instead, and deleted afterwards unless `--keep-tif` is given.
 
@@ -217,7 +230,7 @@ How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB
     ```bash
     uv run python -m src.alos2_dl --granule-file GRANULE_LIST.csv
     ```
-    `--granule-file` is required; a bare filename is looked up in `data/alos2_granule_files/`. `--granule NAME [NAME ...]` downloads only those granules from the CSV. `--polarization` picks `HH` and/or `HV` (defaults to both). `--mask` also downloads each scene's `_MSK.tif`, needed for `--mask` at conversion.
+    `--granule-file` is required; a bare filename is looked up in `data/alos2_granule_files/`. `--granule NAME [NAME ...]` downloads only those granules from the CSV. `--polarization` (can also be declared as `--pol`) picks `HH` and/or `HV` (defaults to both). `--mask` also downloads each scene's `_MSK.tif`, needed for `--mask` at conversion.
 3. Convert the source tifs (DN) to calibrated gamma0 GeoTIFFs in `data/alos2_geotiffs/`. A bare filename is looked up in `data/alos2_tif_scenes/`.
     ```bash
     uv run python -m src.alos2_convert_to_tiff --tif SCENE_HH_SLP.tif [SCENE_HV_SLP.tif ...]
@@ -225,9 +238,11 @@ How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB
     Flags:
     - `--db`
     - `--mask`: needs the scene's `_MSK.tif` (download it with `src.alos2_dl --mask`)
-    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop
+    - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop, required with bbox
     - `--remove-tif`
     - `--out-dir`
+    - `--overwrite`
+    - `--crs EPSG:CODE`: reproject the output (defaults to the scene's own UTM zone)
     - `--inspect`: print the tif's profile and tags instead of converting
 
 # License
