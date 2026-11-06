@@ -127,9 +127,11 @@ uv run python -m src.nisar_access --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
 Flags:
 - `--product`
 - `--polarization POL [POL ...]`: one GeoTIFF per polarization; defaults per product, polarization options may not be consistent by collection
+    - Can also be declared as `--pol`
     - GCOV: `HHHH`, `HVHV`, `VVVV`
     - GSLC/GUNW: `HH`, `HV`
 - `--frequency A|B`: Frequency A products are higher resolution, but also larger files. Defaults to Frequency B.
+    - Can also be declared as `--freq`
 - `--db`: applies to GSLC/GCOV only.
 - `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene).
 - `--crs EPSG:CODE`: reprojects the output GeoTIFF, e.g. `EPSG:4326` or `EPSG:3857` (defaults to the scene's own CRS, usually UTM). The code is added to the file name, e.g. `_epsg4326`.
@@ -170,7 +172,9 @@ Remote reads are many small sequential requests, so their time grows with the pi
     ```
     Flags:
     - `--polarization`
+        - Can also be declared as `--pol`
     - `--frequency A|B`: defaults to B
+        - Can also be declared as `--freq`
     - `--db`
     - `--bbox MIN_LON MIN_LAT MAX_LON MAX_LAT --aoi-name NAME`: crop, required with bbox. `--h5` also accepts ASF download URLs (the `URL` column of the search CSV), which with `--bbox` reads just that area without downloading the file.
     - `--remove-h5`
@@ -199,6 +203,7 @@ uv run python -m src.alos2_access --aoi AOI_NAME --sd YYYY-MM-DD --ed YYYY-MM-DD
 Flags:
 - `--mode MODE [MODE ...]`: only these beam modes (defaults to all)
 - `--polarization POL [POL ...]`: `HH` and/or `HV`, one GeoTIFF per polarization (defaults to both)
+    - Can also be declared as `--pol`
 - `--db`: write gamma0 in dB
 - `--mask`: set layover, shadow and invalid pixels to NaN (also downloads each scene's `_MSK.tif`)
 - `--crop`: crops the output GeoTIFF to the AOI bbox (defaults to keeping the full scene)
@@ -225,7 +230,7 @@ How the data is fetched: JAXA's L2.2 files are Cloud-Optimized GeoTIFFs (~400 MB
     ```bash
     uv run python -m src.alos2_dl --granule-file GRANULE_LIST.csv
     ```
-    `--granule-file` is required; a bare filename is looked up in `data/alos2_granule_files/`. `--granule NAME [NAME ...]` downloads only those granules from the CSV. `--polarization` picks `HH` and/or `HV` (defaults to both). `--mask` also downloads each scene's `_MSK.tif`, needed for `--mask` at conversion.
+    `--granule-file` is required; a bare filename is looked up in `data/alos2_granule_files/`. `--granule NAME [NAME ...]` downloads only those granules from the CSV. `--polarization` (can also be declared as `--pol`) picks `HH` and/or `HV` (defaults to both). `--mask` also downloads each scene's `_MSK.tif`, needed for `--mask` at conversion.
 3. Convert the source tifs (DN) to calibrated gamma0 GeoTIFFs in `data/alos2_geotiffs/`. A bare filename is looked up in `data/alos2_tif_scenes/`.
     ```bash
     uv run python -m src.alos2_convert_to_tiff --tif SCENE_HH_SLP.tif [SCENE_HV_SLP.tif ...]
